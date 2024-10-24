@@ -1,0 +1,4 @@
+comment = 'Postgres extension for storing and analyzing DNA sequences.'c
+default_version = '1.0.0'
+relocatable = true
+module_pathname = '$libdir/kmer'
