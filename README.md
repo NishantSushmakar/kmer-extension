@@ -12,8 +12,8 @@ make
 # Install the extension
 make install
 
-## For testing
-Restart the query tool and run the below given command
+# For testing
+# Restart the query tool and run the below given command
 CREATE EXTENSION kmer CASCADE;
 
 ```
