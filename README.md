@@ -13,6 +13,7 @@ make
 make install
 
 ## For testing
+Restart the query tool and run the below given command
 CREATE EXTENSION kmer CASCADE;
 
 ```
