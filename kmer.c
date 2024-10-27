@@ -1,6 +1,9 @@
 #include "postgres.h"
 #include "fmgr.h"
 #include "utils/builtins.h"
+#include "lib/stringinfo.h"
+#include "utils/elog.h"
+#include <ctype.h>
 
 PG_MODULE_MAGIC;
 
@@ -25,13 +28,48 @@ typedef struct {
     char sequence[MAX_KMER_LENGTH];
 } QKMER;
 
+
+/*Helper Function to Validate the DNA Sequence for A,C,G and T characters*/
+
+static inline char * validate_sequence(char *input){
+
+    char *ptr = input;
+    char c;
+
+    for (ptr=input;*ptr;ptr++){
+        c = tolower(*ptr);
+        *ptr = c;
+
+        if ((c!='a')&&(c!='c')&&(c!='g')&&(c!='t')){
+            ereport(ERROR,
+                    (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+                    errmsg("Invalid DNA Sequence"),
+                    errdetail("Valid characters are A, C, G, T (case-insensitive).")));
+
+        }
+    }
+
+    return input;
+}
+
+
+
 /* DNA Input and Output Functions */
 PG_FUNCTION_INFO_V1(dna_in);
 Datum
 dna_in(PG_FUNCTION_ARGS)
 {
     char *input = PG_GETARG_CSTRING(0);
-    int len = strlen(input);
+    int len;
+
+    if (input == NULL){
+        PG_RETURN_NULL();
+        } 
+
+    len = strlen(input);
+
+    input = validate_sequence(input);
+    
 
     DNA *result = (DNA *) palloc(VARHDRSZ + len);
     SET_VARSIZE(result, VARHDRSZ + len);
@@ -56,7 +94,22 @@ Datum
 kmer_in(PG_FUNCTION_ARGS)
 {
     char *input = PG_GETARG_CSTRING(0);
-    int len = strlen(input);
+    int len;
+
+    if (input == NULL){
+        PG_RETURN_NULL();
+        } 
+
+    len = strlen(input);
+
+    if (len > MAX_KMER_LENGTH){
+        ereport(ERROR,
+                    (errcode(ERRCODE_STRING_DATA_RIGHT_TRUNCATION),
+                    errmsg("K-Mer Sequence larger than length 32")));        
+
+    }
+
+    input = validate_sequence(input);
 
     KMER *result = (KMER *) palloc(sizeof(KMER));
     memset(result->sequence, 0, sizeof(result->sequence));
@@ -82,7 +135,48 @@ Datum
 qkmer_in(PG_FUNCTION_ARGS)
 {
     char *input = PG_GETARG_CSTRING(0);
-    int len = strlen(input);
+    int len;
+    char *ptr = input;
+    char c;
+
+    if (input == NULL){
+        PG_RETURN_NULL();
+        } 
+
+    len = strlen(input);
+
+    if (len > MAX_KMER_LENGTH){
+        ereport(ERROR,
+                    (errcode(ERRCODE_STRING_DATA_RIGHT_TRUNCATION),
+                    errmsg("QKMer Sequence larger than length 32")));        
+
+    }
+
+    for (ptr=input;*ptr;ptr++){
+        c = tolower(*ptr);
+        *ptr = c;
+
+        if (c != 'a' &&   // Adenine
+        c != 'c' &&   // Cytosine
+        c != 'g' &&   // Guanine
+        c != 't' &&   // Thymine
+        c != 'u' &&   // Uracil
+        c != 'r' &&   // A or G
+        c != 'y' &&   // C or T
+        c != 'k' &&   // G or T
+        c != 'm' &&   // A or C
+        c != 's' &&   // G or C
+        c != 'w' &&   // A or T
+        c != 'b' &&   // C, G, or T (not A)
+        c != 'd' &&   // A, G, or T (not C)
+        c != 'h' &&   // A, C, or T (not G)
+        c != 'v' &&   // A, C, or G (not T)
+        c != 'n'      // A, T, C, or G (any nucleotide)
+        ){ereport(ERROR,
+                    (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+                    errmsg("Invalid QKMer Sequence")));} 
+
+    }   
 
     QKMER *result = (QKMER *) palloc(sizeof(QKMER));
     memset(result->sequence, 0, sizeof(result->sequence));

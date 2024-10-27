@@ -11,4 +11,8 @@ make
 
 # Install the extension
 make install
+
+## For testing
+CREATE EXTENSION kmer CASCADE;
+
 ```
