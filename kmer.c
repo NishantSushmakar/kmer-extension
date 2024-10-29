@@ -10,7 +10,8 @@ PG_MODULE_MAGIC;
 /* Maximum length for kmer and qkmer types */
 #define MAX_KMER_LENGTH 32
 
-/* DNA Sequence Type */
+/* DNA Sequence Type */ 
+
 typedef struct {
     int32 length;
     char sequence[FLEXIBLE_ARRAY_MEMBER];
@@ -18,20 +19,20 @@ typedef struct {
 
 /* K-mer Type */
 typedef struct {
-    uint8 length;
-    char sequence[MAX_KMER_LENGTH];
+    int32 length;
+    char sequence[FLEXIBLE_ARRAY_MEMBER];
 } KMER;
 
 /* Query K-mer Type */
 typedef struct {
-    uint8 length;
-    char sequence[MAX_KMER_LENGTH];
+    int32 length;
+    char sequence[FLEXIBLE_ARRAY_MEMBER];
 } QKMER;
 
 
-/*Helper Function to Validate the DNA Sequence for A,C,G and T characters*/
+/* Helper Function to Validate the DNA Sequence for A,C,G and T characters */
 
-static inline char * validate_sequence(char *input){
+static inline void validate_sequence(char *input){
 
     char *ptr = input;
     char c;
@@ -49,7 +50,7 @@ static inline char * validate_sequence(char *input){
         }
     }
 
-    return input;
+    return;
 }
 
 
@@ -61,14 +62,11 @@ dna_in(PG_FUNCTION_ARGS)
 {
     char *input = PG_GETARG_CSTRING(0);
     int len;
-
-    if (input == NULL){
-        PG_RETURN_NULL();
-        } 
+    
 
     len = strlen(input);
 
-    input = validate_sequence(input);
+    validate_sequence(input);
     
 
     DNA *result = (DNA *) palloc(VARHDRSZ + len);
@@ -96,25 +94,22 @@ kmer_in(PG_FUNCTION_ARGS)
     char *input = PG_GETARG_CSTRING(0);
     int len;
 
-    if (input == NULL){
-        PG_RETURN_NULL();
-        } 
-
+    
     len = strlen(input);
 
     if (len > MAX_KMER_LENGTH){
         ereport(ERROR,
                     (errcode(ERRCODE_STRING_DATA_RIGHT_TRUNCATION),
-                    errmsg("K-Mer Sequence larger than length 32")));        
+                    errmsg("KMer Sequence larger than length 32")));        
 
     }
 
-    input = validate_sequence(input);
 
-    KMER *result = (KMER *) palloc(sizeof(KMER));
-    memset(result->sequence, 0, sizeof(result->sequence));
+    validate_sequence(input);
+
+    KMER *result = (KMER *) palloc(VARHDRSZ + len);
+    SET_VARSIZE(result, VARHDRSZ + len);
     memcpy(result->sequence, input, len);
-    result->length = len;
 
     PG_RETURN_POINTER(result);
 }
@@ -124,7 +119,7 @@ Datum
 kmer_out(PG_FUNCTION_ARGS)
 {
     KMER *kmer = (KMER *) PG_GETARG_POINTER(0);
-    char *result = psprintf("%.*s", kmer->length, kmer->sequence);
+    char *result = psprintf("%.*s", VARSIZE_ANY_EXHDR(kmer), kmer->sequence);
 
     PG_RETURN_CSTRING(result);
 }
@@ -138,10 +133,6 @@ qkmer_in(PG_FUNCTION_ARGS)
     int len;
     char *ptr = input;
     char c;
-
-    if (input == NULL){
-        PG_RETURN_NULL();
-        } 
 
     len = strlen(input);
 
@@ -178,10 +169,9 @@ qkmer_in(PG_FUNCTION_ARGS)
 
     }   
 
-    QKMER *result = (QKMER *) palloc(sizeof(QKMER));
-    memset(result->sequence, 0, sizeof(result->sequence));
+    QKMER *result = (QKMER *) palloc(VARHDRSZ + len);
+    SET_VARSIZE(result, VARHDRSZ + len);
     memcpy(result->sequence, input, len);
-    result->length = len;
 
     PG_RETURN_POINTER(result);
 }
@@ -191,7 +181,7 @@ Datum
 qkmer_out(PG_FUNCTION_ARGS)
 {
     QKMER *qkmer = (QKMER *) PG_GETARG_POINTER(0);
-    char *result = psprintf("%.*s", qkmer->length, qkmer->sequence);
+    char *result = psprintf("%.*s", VARSIZE_ANY_EXHDR(qkmer), qkmer->sequence);
 
     PG_RETURN_CSTRING(result);
 }

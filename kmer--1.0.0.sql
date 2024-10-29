@@ -30,7 +30,7 @@ CREATE OR REPLACE FUNCTION kmer_out(kmer)
 CREATE TYPE kmer (
     INPUT = kmer_in,
     OUTPUT = kmer_out,
-    INTERNALLENGTH = 32
+    INTERNALLENGTH = VARIABLE
 );
 
 CREATE OR REPLACE FUNCTION qkmer_in(cstring)
@@ -46,7 +46,7 @@ CREATE OR REPLACE FUNCTION qkmer_out(qkmer)
 CREATE TYPE qkmer (
     INPUT = qkmer_in,
     OUTPUT = qkmer_out,
-    INTERNALLENGTH = 32
+    INTERNALLENGTH = VARIABLE
 );
 
 -- Length functions
