@@ -76,8 +76,34 @@ CREATE FUNCTION starts_with(kmer, kmer)
     AS 'MODULE_PATHNAME', 'kmer_starts_with'
     LANGUAGE C IMMUTABLE STRICT;
 
+CREATE FUNCTION starts_with_op(kmer,kmer)
+    RETURNS boolean
+    AS 'MODULE_PATHNAME', 'kmer_starts_with_op'
+    LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION contains(qkmer,kmer)
+    RETURNS boolean
+    AS 'MODULE_PATHNAME', 'kmer_contains'
+    LANGUAGE C IMMUTABLE STRICT;
+
 -- Comparison operators
+
+-- Equal Operator
 CREATE OPERATOR = (
   LEFTARG = kmer, RIGHTARG = kmer,
   PROCEDURE = equals
 );
+-- Starts with Operator
+CREATE OPERATOR ^@ (
+    LEFTARG = kmer,
+    RIGHTARG = kmer,
+    PROCEDURE= starts_with_op
+);
+
+-- Contains Operator
+CREATE OPERATOR @> (
+    LEFTARG = qkmer,
+    RIGHTARG = kmer,
+    PROCEDURE= contains
+);
+

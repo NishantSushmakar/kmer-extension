@@ -53,6 +53,30 @@ static inline void validate_sequence(char *input){
     return;
 }
 
+/* Helper Function to  match the possible DNA sequences for a given QKMer */
+static inline bool match(char pattern, char nucleotide){
+
+       if (pattern == nucleotide || pattern == 'n')
+            return true;
+        
+    
+        switch(pattern){
+        case 'r': return nucleotide == 'a' || nucleotide == 'g';  // puRine
+        case 'y': return nucleotide == 'c' || nucleotide == 't';  // pYrimidine
+        case 'k': return nucleotide == 'g' || nucleotide == 't';  // Keto
+        case 'm': return nucleotide == 'a' || nucleotide == 'c';  // aMino
+        case 's': return nucleotide == 'g' || nucleotide == 'c';  // Strong
+        case 'w': return nucleotide == 'a' || nucleotide == 't';  // Weak
+        case 'b': return nucleotide == 'c' || nucleotide == 'g' || nucleotide == 't';  // not A
+        case 'd': return nucleotide == 'a' || nucleotide == 'g' || nucleotide == 't';  // not C
+        case 'h': return nucleotide == 'a' || nucleotide == 'c' || nucleotide == 't';  // not G
+        case 'v': return nucleotide == 'a' || nucleotide == 'c' || nucleotide == 'g';  // not T
+        default: false;
+
+        }
+
+}
+
 
 
 /* DNA Input and Output Functions */
@@ -200,7 +224,7 @@ Datum
 kmer_length(PG_FUNCTION_ARGS)
 {
     KMER *kmer = (KMER *) PG_GETARG_POINTER(0);
-    PG_RETURN_INT32(kmer->length);
+    PG_RETURN_INT32(VARSIZE_ANY_EXHDR(kmer));
 }
 
 PG_FUNCTION_INFO_V1(qkmer_length);
@@ -208,7 +232,7 @@ Datum
 qkmer_length(PG_FUNCTION_ARGS)
 {
     QKMER *qkmer = (QKMER *) PG_GETARG_POINTER(0);
-    PG_RETURN_INT32(qkmer->length);
+    PG_RETURN_INT32(VARSIZE_ANY_EXHDR(qkmer));
 }
 
 /* Comparison functions */
@@ -219,11 +243,19 @@ kmer_equals(PG_FUNCTION_ARGS)
     KMER *kmer1 = (KMER *) PG_GETARG_POINTER(0);
     KMER *kmer2 = (KMER *) PG_GETARG_POINTER(1);
 
+    // If either of the value is null return false
+    if (PG_ARGISNULL(0) || PG_ARGISNULL(1))
+        PG_RETURN_BOOL(false);
+    
+
+    int len1 = VARSIZE_ANY_EXHDR(kmer1);
+    int len2 = VARSIZE_ANY_EXHDR(kmer2);
+
     // if lengths are unequal, then they are automatically unequal
-    if (kmer1->length != kmer2->length)
+    if (len1 != len2)
         PG_RETURN_BOOL(false);
 
-    bool result = memcmp(kmer1->sequence, kmer2->sequence, kmer1->length) == 0;
+    bool result = memcmp(VARDATA_ANY(kmer1), VARDATA_ANY(kmer2), len1) == 0;
     PG_RETURN_BOOL(result);
 }
 
@@ -234,9 +266,69 @@ kmer_starts_with(PG_FUNCTION_ARGS)
     KMER *prefix = (KMER *) PG_GETARG_POINTER(0);
     KMER *kmer = (KMER *) PG_GETARG_POINTER(1);
 
-    // if the prefix length is longer than the kmer, then return false
-    if (prefix->length > kmer->length)
+
+    
+    int len1 = VARSIZE_ANY_EXHDR(prefix);
+    int len2 = VARSIZE_ANY_EXHDR(kmer);
+
+    // if length of prefix greater than kmer then its always false
+    if (len1 > len2)
+        PG_RETURN_BOOL(false);
+        
+    
+    bool result = memcmp(VARDATA_ANY(prefix),VARDATA_ANY(kmer),len1) == 0;
+
+    PG_RETURN_BOOL(result);
+}
+
+PG_FUNCTION_INFO_V1(kmer_starts_with_op);
+Datum
+kmer_starts_with_op(PG_FUNCTION_ARGS)
+{
+    KMER *kmer = (KMER *) PG_GETARG_POINTER(0);
+    KMER *prefix = (KMER *) PG_GETARG_POINTER(1);
+
+
+    
+    int len1 = VARSIZE_ANY_EXHDR(prefix);
+    int len2 = VARSIZE_ANY_EXHDR(kmer);
+
+    // if length of prefix greater than kmer then its always false
+    if (len1 > len2)
+        PG_RETURN_BOOL(false);
+        
+    bool result = memcmp(VARDATA_ANY(prefix),VARDATA_ANY(kmer),len1) == 0;
+
+    PG_RETURN_BOOL(result);
+}
+
+PG_FUNCTION_INFO_V1(kmer_contains);
+Datum
+kmer_contains(PG_FUNCTION_ARGS)
+{
+    QKMER *qkmer = (QKMER *) PG_GETARG_POINTER(0);
+    KMER *kmer = (KMER *) PG_GETARG_POINTER(1);
+
+
+    
+    int len1 = VARSIZE_ANY_EXHDR(qkmer);
+    int len2 = VARSIZE_ANY_EXHDR(kmer);
+
+    // if length of Qkmer and kmer not equal then that is not a match
+    if (len1 != len2)
         PG_RETURN_BOOL(false);
 
-    PG_RETURN_BOOL(memcmp(prefix->sequence, kmer->sequence, prefix->length) == 0);
+
+    char *qkmer_str = VARDATA_ANY(qkmer);
+    char *kmer_str = VARDATA_ANY(kmer);      
+
+    for(int i=0;i<len1;i++){
+
+        if(!match(qkmer_str[i],kmer_str[i])){
+            PG_RETURN_BOOL(false);
+        }
+
+    }
+
+    PG_RETURN_BOOL(true);
 }
