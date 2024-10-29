@@ -86,6 +86,13 @@ CREATE FUNCTION contains(qkmer,kmer)
     AS 'MODULE_PATHNAME', 'kmer_contains'
     LANGUAGE C IMMUTABLE STRICT;
 
+-- Generator Function
+CREATE OR REPLACE FUNCTION generate_kmers(dna, integer)
+    RETURNS SETOF kmer
+    AS 'MODULE_PATHNAME', 'generate_kmers'
+    LANGUAGE C IMMUTABLE STRICT;
+
+
 -- Comparison operators
 
 -- Equal Operator

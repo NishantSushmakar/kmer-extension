@@ -4,6 +4,7 @@
 #include "lib/stringinfo.h"
 #include "utils/elog.h"
 #include <ctype.h>
+#include "funcapi.h"
 
 PG_MODULE_MAGIC;
 
@@ -236,6 +237,8 @@ qkmer_length(PG_FUNCTION_ARGS)
 }
 
 /* Comparison functions */
+
+// Equals Function
 PG_FUNCTION_INFO_V1(kmer_equals);
 Datum
 kmer_equals(PG_FUNCTION_ARGS)
@@ -259,6 +262,7 @@ kmer_equals(PG_FUNCTION_ARGS)
     PG_RETURN_BOOL(result);
 }
 
+// starts with function
 PG_FUNCTION_INFO_V1(kmer_starts_with);
 Datum
 kmer_starts_with(PG_FUNCTION_ARGS)
@@ -281,6 +285,7 @@ kmer_starts_with(PG_FUNCTION_ARGS)
     PG_RETURN_BOOL(result);
 }
 
+// starts with function specially for the operator
 PG_FUNCTION_INFO_V1(kmer_starts_with_op);
 Datum
 kmer_starts_with_op(PG_FUNCTION_ARGS)
@@ -302,6 +307,7 @@ kmer_starts_with_op(PG_FUNCTION_ARGS)
     PG_RETURN_BOOL(result);
 }
 
+// contains function
 PG_FUNCTION_INFO_V1(kmer_contains);
 Datum
 kmer_contains(PG_FUNCTION_ARGS)
@@ -331,4 +337,77 @@ kmer_contains(PG_FUNCTION_ARGS)
     }
 
     PG_RETURN_BOOL(true);
+}
+
+// generate kmer function
+// https://www.postgresql.org/docs/current/xfunc-c.html#XFUNC-C-RETURN-SET
+PG_FUNCTION_INFO_V1(generate_kmers);
+Datum
+generate_kmers(PG_FUNCTION_ARGS){
+
+    FuncCallContext     *funcctx;
+    int                  call_cntr;
+    int                  max_calls;
+
+    if (SRF_IS_FIRSTCALL()){
+
+        MemoryContext   oldcontext;
+        
+        funcctx = SRF_FIRSTCALL_INIT();
+        oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
+
+
+        DNA *dna = (DNA *) PG_GETARG_POINTER(0);
+        int window_size = PG_GETARG_INT32(1);
+
+        int len_dna = VARSIZE_ANY_EXHDR(dna);
+
+        if (len_dna < window_size || window_size <= 0 || window_size > MAX_KMER_LENGTH)
+            ereport(ERROR,
+                        (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                        errmsg("Invalid KMER Length")));
+
+        // Total Number of calls to make
+        funcctx->max_calls = len_dna - window_size + 1;
+
+        // User context saved for each call        
+        funcctx->user_fctx = palloc(sizeof(struct {
+            char *sequence;
+            int k_size;
+        }));
+
+        ((struct { char *sequence; int k_size; }*)funcctx->user_fctx)->sequence = pstrdup(VARDATA_ANY(dna));
+        ((struct { char *sequence; int k_size; }*)funcctx->user_fctx)->k_size = window_size ;       
+
+
+       
+        MemoryContextSwitchTo(oldcontext);
+    }
+
+
+
+    funcctx = SRF_PERCALL_SETUP();
+
+    call_cntr = funcctx->call_cntr;
+    max_calls = funcctx->max_calls;
+
+    if (call_cntr < max_calls){
+
+        char *dna_sequence = ((struct { char *sequence; int k_size; }*)funcctx->user_fctx)->sequence;
+        int window_size = ((struct { char *sequence; int k_size; }*)funcctx->user_fctx)->k_size;
+
+        KMER *kmer = (KMER *) palloc(VARHDRSZ + window_size);
+        SET_VARSIZE(kmer, VARHDRSZ + window_size);
+        memcpy(VARDATA(kmer), dna_sequence + call_cntr, window_size);
+
+
+
+        SRF_RETURN_NEXT(funcctx, PointerGetDatum(kmer));
+
+    }
+    else    
+    {
+        SRF_RETURN_DONE(funcctx);
+    }
+
 }
