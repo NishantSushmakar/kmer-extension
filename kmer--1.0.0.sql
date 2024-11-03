@@ -99,6 +99,7 @@ CREATE OR REPLACE FUNCTION generate_kmers(dna, integer)
 CREATE OPERATOR = (
   LEFTARG = kmer, RIGHTARG = kmer,
   PROCEDURE = equals
+
 );
 -- Starts with Operator
 CREATE OPERATOR ^@ (
@@ -114,3 +115,26 @@ CREATE OPERATOR @> (
     PROCEDURE= contains
 );
 
+-- Comparison function for B-tree support
+CREATE FUNCTION cmp(kmer, kmer)
+    RETURNS integer
+    AS 'MODULE_PATHNAME', 'kmer_cmp'
+    LANGUAGE C IMMUTABLE STRICT;
+
+-- Hash function
+CREATE FUNCTION hash(kmer)
+    RETURNS integer
+    AS 'MODULE_PATHNAME', 'kmer_hash'
+    LANGUAGE C IMMUTABLE STRICT;
+
+-- Create the operator class for B-tree support
+CREATE OPERATOR CLASS kmer_btree_ops
+    DEFAULT FOR TYPE kmer USING btree AS
+        OPERATOR        3       = ,
+        FUNCTION        1       cmp(kmer, kmer);
+
+-- Create the operator class for hash support
+CREATE OPERATOR CLASS kmer_hash_ops
+    DEFAULT FOR TYPE kmer USING hash AS
+        OPERATOR        1      = ,
+        FUNCTION        1       hash(kmer);
