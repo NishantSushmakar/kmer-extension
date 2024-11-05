@@ -86,6 +86,26 @@ CREATE FUNCTION contains(qkmer,kmer)
     AS 'MODULE_PATHNAME', 'kmer_contains'
     LANGUAGE C IMMUTABLE STRICT;
 
+CREATE FUNCTION kmer_lt(kmer, kmer) 
+    RETURNS boolean
+    AS 'MODULE_PATHNAME', 'kmer_lt'
+    LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION kmer_le(kmer, kmer) 
+    RETURNS boolean
+    AS 'MODULE_PATHNAME', 'kmer_le'
+    LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION kmer_gt(kmer, kmer) 
+    RETURNS boolean
+    AS 'MODULE_PATHNAME', 'kmer_gt'
+    LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION kmer_ge(kmer, kmer) 
+    RETURNS boolean
+    AS 'MODULE_PATHNAME', 'kmer_ge'
+    LANGUAGE C IMMUTABLE STRICT;
+
 -- Generator Function
 CREATE OR REPLACE FUNCTION generate_kmers(dna, integer)
     RETURNS SETOF kmer
@@ -99,18 +119,110 @@ CREATE OR REPLACE FUNCTION generate_kmers(dna, integer)
 CREATE OPERATOR = (
   LEFTARG = kmer, RIGHTARG = kmer,
   PROCEDURE = equals
+
 );
 -- Starts with Operator
 CREATE OPERATOR ^@ (
     LEFTARG = kmer,
     RIGHTARG = kmer,
-    PROCEDURE= starts_with_op
+    PROCEDURE = starts_with_op
 );
 
 -- Contains Operator
 CREATE OPERATOR @> (
     LEFTARG = qkmer,
     RIGHTARG = kmer,
-    PROCEDURE= contains
+    PROCEDURE = contains
 );
+
+CREATE OPERATOR < (
+    LEFTARG = kmer,
+    RIGHTARG = kmer,
+    PROCEDURE = kmer_lt
+);
+
+CREATE OPERATOR <= (
+    LEFTARG = kmer,
+    RIGHTARG = kmer,
+    PROCEDURE = kmer_le
+);
+
+CREATE OPERATOR >= (
+    LEFTARG = kmer,
+    RIGHTARG = kmer,
+    PROCEDURE = kmer_ge
+);
+
+CREATE OPERATOR > (
+    LEFTARG = kmer,
+    RIGHTARG = kmer,
+    PROCEDURE = kmer_gt
+);
+
+-- Comparison function for B-tree support
+CREATE FUNCTION kmer_compare(kmer, kmer)
+    RETURNS integer
+    AS 'MODULE_PATHNAME', 'kmer_cmp'
+    LANGUAGE C IMMUTABLE STRICT;
+
+-- -- Hash function
+CREATE FUNCTION hash(kmer)
+   RETURNS integer
+   AS 'MODULE_PATHNAME', 'kmer_hash'
+  LANGUAGE C IMMUTABLE STRICT;
+
+-- Create the operator class for B-tree support
+CREATE OPERATOR CLASS kmer_btree_ops
+    DEFAULT FOR TYPE kmer USING btree AS
+        OPERATOR        3       = ,
+        FUNCTION        1       kmer_compare(kmer, kmer);
+
+-- Create the operator class for hash support
+CREATE OPERATOR CLASS kmer_hash_ops
+    DEFAULT FOR TYPE kmer USING hash AS
+       OPERATOR        1      = ,
+       FUNCTION        1       hash(kmer);
+
+CREATE FUNCTION kmer_config(internal, internal)
+    RETURNS void
+    AS 'MODULE_PATHNAME', 'kmer_config'
+    LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION kmer_choose(internal, internal)
+    RETURNS void
+    AS 'MODULE_PATHNAME', 'kmer_choose'
+    LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION kmer_picksplit(internal, internal)
+    RETURNS void
+    AS 'MODULE_PATHNAME', 'kmer_picksplit'
+    LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION kmer_inner_consistent(internal, internal)
+    RETURNS void
+    AS 'MODULE_PATHNAME', 'kmer_inner_consistent'
+    LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION kmer_leaf_consistent(internal, internal)
+    RETURNS boolean
+    AS 'MODULE_PATHNAME', 'kmer_leaf_consistent'
+    LANGUAGE C IMMUTABLE STRICT;
+
+-- Create the operator class for SP-GiST support
+CREATE OPERATOR CLASS kmer_spgist_ops
+    DEFAULT FOR TYPE kmer USING spgist AS
+    -- Define the required SP-GiST support functions
+    OPERATOR 1 < (kmer, kmer),
+    OPERATOR 2 <= (kmer, kmer),
+    OPERATOR 3 = (kmer, kmer),
+    OPERATOR 4 >= (kmer, kmer),
+    OPERATOR 5 > (kmer, kmer),
+    OPERATOR 6 ^@ (kmer, kmer),
+    OPERATOR 7 @> (qkmer, kmer),
+    FUNCTION 1 kmer_compare(kmer, kmer),
+    FUNCTION 2 kmer_choose(internal, internal),
+    FUNCTION 3 kmer_picksplit(internal, internal),
+    FUNCTION 4 kmer_inner_consistent(internal, internal),
+    FUNCTION 5 kmer_leaf_consistent(internal, internal);
+
 
