@@ -1,7 +1,6 @@
 #include "postgres.h"
 #include "fmgr.h"
 #include "funcapi.h"
-#include "varatt.h"
 #include <ctype.h>
 #include "access/hash.h"
 #include "access/spgist.h"
@@ -16,6 +15,10 @@
 #include "utils/varlena.h"
 #include "utils/elog.h"
 #include "utils/builtins.h"
+#include "utils/typcache.h"
+#include "utils/syscache.h"
+#include "catalog/namespace.h"
+#include "utils/fmgroids.h"
 
 PG_MODULE_MAGIC;
 
@@ -109,7 +112,7 @@ static inline bool match(char pattern, char nucleotide)
 	case 'v':
 		return nucleotide == 'a' || nucleotide == 'c' || nucleotide == 'g'; // not T
 	default:
-		false;
+		return false;
 	}
 }
 
@@ -148,7 +151,6 @@ formKmerDatum(const char *data, int datalen)
 
 	// Set the VARSIZE and assign sequence length
 	SET_VARSIZE(kmer_p, VARHDRSZ + datalen);
-	kmer_p->length = datalen;
 
 	// Copy the sequence data
 	memcpy(kmer_p->sequence, data, datalen);
@@ -596,18 +598,16 @@ Datum kmer_hash(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(kmer_config);
 Datum kmer_config(PG_FUNCTION_ARGS)
 {
-	spgConfigIn *cfgin = (spgConfigIn *)PG_GETARG_POINTER(0);
 	spgConfigOut *cfg = (spgConfigOut *)PG_GETARG_POINTER(1);
 
-	Oid kmerOID = TypenameGetTypid("kmer");
-
-	cfgin->attType = 
+	Oid KMEROID = TypenameGetTypid("kmer");
 
 	/* Set the prefix and label types specific to the kmer data type */
-	cfg->prefixType = kmerOID; /* Replace KMEROID with the OID of the kmer type */
-	cfg->labelType = VOIDOID;
+	cfg->prefixType = KMEROID;
+	cfg->labelType = INT2OID;
+	cfg->leafType = KMEROID;
 	cfg->canReturnData = true;
-	cfg->longValuesOK = true; /* Suffixing to shorten long values */
+	cfg->longValuesOK = false;
 
 	PG_RETURN_VOID();
 }
@@ -615,9 +615,10 @@ Datum kmer_config(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(kmer_choose);
 Datum kmer_choose(PG_FUNCTION_ARGS)
 {
-	spgChooseIn *in = (spgChooseIn *)PG_GETARG_POINTER(0);
-	spgChooseOut *out = (spgChooseOut *)PG_GETARG_POINTER(1);
-	KMER *inKmer = (KMER *)DatumGetPointer(in->datum);
+	spgChooseIn *in = (spgChooseIn *) PG_GETARG_POINTER(0);
+	spgChooseOut *out = (spgChooseOut *) PG_GETARG_POINTER(1);
+
+	KMER *inKmer = (KMER *) DatumGetPointer(in->datum);
 	char *inStr = inKmer->sequence;
 	int inSize = inKmer->length;
 	char *prefixStr = NULL;
@@ -852,7 +853,7 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 
 	/* Allocate and construct the new reconstructed k-mer */
 	reconstrKmer = (KMER *)palloc(VARHDRSZ + maxReconstrLen);
-	reconstrKmer->length = maxReconstrLen;
+	SET_VARSIZE(reconstrKmer, VARHDRSZ + maxReconstrLen);
 
 	if (in->level)
 		memcpy(reconstrKmer->sequence, reconstructedValue->sequence, in->level);
@@ -937,8 +938,8 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(kmer_leaf_consistent);
 Datum kmer_leaf_consistent(PG_FUNCTION_ARGS)
 {
-	spgLeafConsistentIn *in = (spgLeafConsistentIn *)PG_GETARG_POINTER(0);
-	spgLeafConsistentOut *out = (spgLeafConsistentOut *)PG_GETARG_POINTER(1);
+	spgLeafConsistentIn *in = (spgLeafConsistentIn *) PG_GETARG_POINTER(0);
+	spgLeafConsistentOut *out = (spgLeafConsistentOut *) PG_GETARG_POINTER(1);
 	int level = in->level;
 	KMER *leafValue, *reconstrValue = NULL;
 	char *fullValue;
@@ -949,11 +950,11 @@ Datum kmer_leaf_consistent(PG_FUNCTION_ARGS)
 	/* All tests are exact, so recheck is not required */
 	out->recheck = false;
 
-	leafValue = (KMER *)DatumGetPointer(in->leafDatum);
+	leafValue = (KMER *) DatumGetPointer(in->leafDatum);
 
 	/* Get the reconstructed value from the previous level, if any */
 	if (DatumGetPointer(in->reconstructedValue))
-		reconstrValue = (KMER *)DatumGetPointer(in->reconstructedValue);
+		reconstrValue = (KMER *) DatumGetPointer(in->reconstructedValue);
 
 	Assert(reconstrValue == NULL ? level == 0 : reconstrValue->length == level);
 
@@ -967,8 +968,8 @@ Datum kmer_leaf_consistent(PG_FUNCTION_ARGS)
 	else
 	{
 		/* Allocate and build the full k-mer sequence */
-		KMER *fullKmer = (KMER *)palloc(sizeof(KMER) + fullLen);
-		fullKmer->length = fullLen;
+		KMER *fullKmer = palloc(VARHDRSZ + fullLen);
+		SET_VARSIZE(fullKmer, VARHDRSZ + fullLen);
 		fullValue = fullKmer->sequence;
 
 		/* Copy previous reconstruction and leafValue sequences */

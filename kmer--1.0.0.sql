@@ -210,7 +210,7 @@ CREATE FUNCTION kmer_leaf_consistent(internal, internal)
 
 -- Create the operator class for SP-GiST support
 CREATE OPERATOR CLASS kmer_spgist_ops
-    DEFAULT FOR TYPE kmer USING spgist AS
+    DEFAULT FOR TYPE kmer USING SPGIST AS
     -- Define the required SP-GiST support functions
     OPERATOR 1 < (kmer, kmer),
     OPERATOR 2 <= (kmer, kmer),
@@ -218,11 +218,8 @@ CREATE OPERATOR CLASS kmer_spgist_ops
     OPERATOR 4 >= (kmer, kmer),
     OPERATOR 5 > (kmer, kmer),
     OPERATOR 6 ^@ (kmer, kmer),
-    OPERATOR 7 @> (qkmer, kmer),
-    FUNCTION 1 kmer_compare(kmer, kmer),
+    FUNCTION 1 kmer_config(internal, internal),
     FUNCTION 2 kmer_choose(internal, internal),
     FUNCTION 3 kmer_picksplit(internal, internal),
     FUNCTION 4 kmer_inner_consistent(internal, internal),
     FUNCTION 5 kmer_leaf_consistent(internal, internal);
-
-
