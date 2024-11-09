@@ -22,16 +22,16 @@ CREATE TABLE dna_kmer_test (
         ('GATTACA', 'GATTACAX', 'GATTACAX');  -- Invalid character in kmer and qkmer
 
 -- DELETION
-    DELETE FROM dna_kmer_test WHERE dna_sequence = 'CGTACGTACGTA';
+    DELETE FROM dna_kmer_test WHERE dna_sequence = 'CGTACGTACGTA'::dna;
 
 -- SEARCH without index
-    SELECT * FROM dna_kmer_test WHERE kmer_sequence = 'AGCTAGCT';
+    SELECT * FROM dna_kmer_test WHERE kmer_sequence = 'AGCTAGCT'::kmer;
 
 -- INDEX
     CREATE INDEX kmer_index ON dna_kmer_test USING spgist (kmer_sequence);
 
 -- SEARCH with index
-    SELECT * FROM dna_kmer_test WHERE kmer_sequence = 'AGCTAGCT';
+    SELECT * FROM dna_kmer_test WHERE kmer_sequence = 'AGCTAGCT'::kmer;
 
 -- ########################################################################
 
@@ -110,6 +110,25 @@ CREATE TABLE dna_kmer_test (
         generate_kmers('ACGTACGT'::dna, 4) AS a(kmer), 
         generate_kmers('GTACGTAC'::dna, 4) AS b(kmer); 
 
+
+-- ################################ = Operator ################################
+
+-- Functionality Test: Test whether the operator works as expected or not
+    SELECT 'ACGTACGT'::kmer = 'ACGTACGT'::kmer; -- Return True
+
+-- Null values: Test whether two null values are the same or whether a null value and a non null are the same 
+    SELECT 
+            NULL::kmer = 'ACGTA'::kmer, -- Return NULL 
+            NULL::kmer = NULL::kmer, -- Return Null
+            ''::kmer = NULL::kmer; -- Return Null
+
+-- Empty values: Test whether two empty sequences are the same or one empty and one full sequence
+    -- Return True
+    SELECT ''::kmer = ''::kmer;
+
+    -- Return False
+    SELECT 'A'::kmer = ''::kmer;
+
 -- Inner Join: Compute the inner join fo two different generated kmers
 -- It should return 6 rows: ACGT, CGTA, GTAC, TACG, TACGT, GTAC
     SELECT a.kmer, b.kmer 
@@ -141,8 +160,8 @@ CREATE TABLE dna_kmer_test (
 
 
 -- ################################ equals ################################
--- Functionality Test: Test whether the funciton works as expected or not
-    SELECT equals('ACGTACGT'::kmer, 'ACGTACGT'::kmer), -- Return True
+-- Functionality Test: Test whether the function works as expected or not
+    SELECT equals('ACGTACGT'::kmer, 'ACGTACGT'::kmer); -- Return True
 
 -- Null values: Test whether two null values are the same or whether a null value and a non null are the same 
     SELECT 
@@ -189,7 +208,7 @@ CREATE TABLE dna_kmer_test (
 
 -- ############################# starts_with ##############################
 
--- Functionality Test: Test whether the funciton works as expected or not
+-- Functionality Test: Test whether the function works as expected or not
     SELECT starts_with('ACG'::kmer, 'ACGTACGT'::kmer); -- Return True
 
 -- Null values
@@ -292,7 +311,7 @@ CREATE TABLE dna_kmer_test (
 
 -- ############################### contains ###############################
 
--- Functionality Test: Test whether the funciton works as expected or not
+-- Functionality Test: Test whether the function works as expected or not
     SELECT contains('ACG'::kmer, 'ACGTACGT'::kmer); -- Return True
 
 -- Null values
