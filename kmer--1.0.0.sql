@@ -1,6 +1,7 @@
 -- complain if script is sourced in psql, rather than via CREATE EXTENSION
 \echo Use "CREATE EXTENSION kmer" to load this file. \quit
 
+-- In and out functions - DNA Type
 CREATE OR REPLACE FUNCTION dna_in(cstring)
     RETURNS dna
     AS 'MODULE_PATHNAME'
@@ -17,6 +18,7 @@ CREATE TYPE dna (
     INTERNALLENGTH = VARIABLE
 );
 
+-- In and out functions - Kmer Type
 CREATE OR REPLACE FUNCTION kmer_in(cstring)
     RETURNS kmer
     AS 'MODULE_PATHNAME'
@@ -33,6 +35,7 @@ CREATE TYPE kmer (
     INTERNALLENGTH = VARIABLE
 );
 
+-- In and out functions - Qkmer Type
 CREATE OR REPLACE FUNCTION qkmer_in(cstring)
     RETURNS qkmer
     AS 'MODULE_PATHNAME'
@@ -86,78 +89,13 @@ CREATE FUNCTION contains(qkmer,kmer)
     AS 'MODULE_PATHNAME', 'kmer_contains'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 
-CREATE FUNCTION kmer_lt(kmer, kmer) 
-    RETURNS boolean
-    AS 'MODULE_PATHNAME', 'kmer_lt'
-    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
-
-CREATE FUNCTION kmer_le(kmer, kmer) 
-    RETURNS boolean
-    AS 'MODULE_PATHNAME', 'kmer_le'
-    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
-
-CREATE FUNCTION kmer_gt(kmer, kmer) 
-    RETURNS boolean
-    AS 'MODULE_PATHNAME', 'kmer_gt'
-    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
-
-CREATE FUNCTION kmer_ge(kmer, kmer) 
-    RETURNS boolean
-    AS 'MODULE_PATHNAME', 'kmer_ge'
-    LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
-
 -- Generator Function
 CREATE OR REPLACE FUNCTION generate_kmers(dna, integer)
     RETURNS SETOF kmer
     AS 'MODULE_PATHNAME', 'generate_kmers'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 
--- Comparison operators
-
--- Equal Operator
-CREATE OPERATOR = (
-  LEFTARG = kmer, RIGHTARG = kmer,
-  PROCEDURE = equals
-
-);
--- Starts with Operator
-CREATE OPERATOR ^@ (
-    LEFTARG = kmer,
-    RIGHTARG = kmer,
-    PROCEDURE = starts_with_op
-);
-
--- Contains Operator
-CREATE OPERATOR @> (
-    LEFTARG = qkmer,
-    RIGHTARG = kmer,
-    PROCEDURE = contains
-);
-
-CREATE OPERATOR < (
-    LEFTARG = kmer,
-    RIGHTARG = kmer,
-    PROCEDURE = kmer_lt
-);
-
-CREATE OPERATOR <= (
-    LEFTARG = kmer,
-    RIGHTARG = kmer,
-    PROCEDURE = kmer_le
-);
-
-CREATE OPERATOR >= (
-    LEFTARG = kmer,
-    RIGHTARG = kmer,
-    PROCEDURE = kmer_ge
-);
-
-CREATE OPERATOR > (
-    LEFTARG = kmer,
-    RIGHTARG = kmer,
-    PROCEDURE = kmer_gt
-);
-
+-- SP-GiST Index Functions
 CREATE FUNCTION kmer_config(internal, internal)
     RETURNS void
     AS 'MODULE_PATHNAME', 'kmer_config'
@@ -183,6 +121,32 @@ CREATE FUNCTION kmer_leaf_consistent(internal, internal)
     AS 'MODULE_PATHNAME', 'kmer_leaf_consistent'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 
+-- Hash index function
+CREATE FUNCTION hash(kmer)
+   RETURNS integer
+   AS 'MODULE_PATHNAME', 'kmer_hash'
+  LANGUAGE C IMMUTABLE STRICT;
+
+-- Comparison operators
+-- Equal Operator
+CREATE OPERATOR = (
+  LEFTARG = kmer, RIGHTARG = kmer,
+  PROCEDURE = equals
+);
+-- Starts with Operator
+CREATE OPERATOR ^@ (
+    LEFTARG = kmer,
+    RIGHTARG = kmer,
+    PROCEDURE = starts_with_op
+);
+
+-- Contains Operator
+CREATE OPERATOR @> (
+    LEFTARG = qkmer,
+    RIGHTARG = kmer,
+    PROCEDURE = contains
+);
+
 -- Create the operator class for SP-GiST support
 CREATE OPERATOR CLASS kmer_spgist_ops
     DEFAULT FOR TYPE kmer USING SPGIST AS
@@ -195,3 +159,9 @@ CREATE OPERATOR CLASS kmer_spgist_ops
     FUNCTION 3 kmer_picksplit(internal, internal),
     FUNCTION 4 kmer_inner_consistent(internal, internal),
     FUNCTION 5 kmer_leaf_consistent(internal, internal);
+
+-- Create the operator class for hash support
+CREATE OPERATOR CLASS kmer_hash_ops
+    DEFAULT FOR TYPE kmer USING hash AS
+       OPERATOR 1 = (kmer, kmer),
+       FUNCTION 1 hash(kmer);

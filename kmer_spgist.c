@@ -2,8 +2,8 @@
  * kmer_spgist.c
  */
 
+#include "kmer_spgist.h"
 #include "kmer.h"
-
 #include "fmgr.h"
 #include "access/spgist.h"
 #include "catalog/pg_type.h"
@@ -12,20 +12,11 @@
 #include "utils/memutils.h"
 #include "utils/lsyscache.h"
 #include "catalog/pg_collation.h"
+#include "funcapi.h"
 
 /*****************************************************************************/
 
-#define SPGIST_MAX_PREFIX_LENGTH Max((int)(BLCKSZ - 258 * 16 - 100), 32)
-
-/* Struct for sorting values in picksplit */
-typedef struct spgNodePtr
-{
-	Datum d;
-	int i;
-	int16 c;
-} spgNodePtr;
-
-// contains function
+// Contains function
 PG_FUNCTION_INFO_V1(kmer_contains);
 Datum kmer_contains(PG_FUNCTION_ARGS)
 {
@@ -35,13 +26,14 @@ Datum kmer_contains(PG_FUNCTION_ARGS)
 	int len1 = VARSIZE_ANY_EXHDR(qkmer);
 	int len2 = VARSIZE_ANY_EXHDR(kmer);
 
-	// if length of Qkmer and kmer not equal then that is not a match
+	// if length of Qkmer and kmer are not equal then is not a match
 	if (len1 != len2)
 		PG_RETURN_BOOL(false);
 
 	char *qkmer_str = VARDATA_ANY(qkmer);
 	char *kmer_str = VARDATA_ANY(kmer);
 
+	// compare every qkmer char to see if is a corresponding match to a kmer
 	for (int i = 0; i < len1; i++)
 	{
 		if (!match(qkmer_str[i], kmer_str[i]))
@@ -53,7 +45,7 @@ Datum kmer_contains(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(true);
 }
 
-// starts with function
+// Starts with function
 PG_FUNCTION_INFO_V1(kmer_starts_with);
 Datum kmer_starts_with(PG_FUNCTION_ARGS)
 {
@@ -67,106 +59,20 @@ Datum kmer_starts_with(PG_FUNCTION_ARGS)
 	if (len1 > len2)
 		PG_RETURN_BOOL(false);
 
+	// compare the kmer with the given prefix
 	bool result = memcmp(VARDATA_ANY(prefix), VARDATA_ANY(kmer), len1) == 0;
 
 	PG_RETURN_BOOL(result);
 }
 
-/*SP-Gist index helper functions*/
-static Datum
-formKmerDatum(const char *data, int datalen)
-{
-    char *kmer;
-
-    // Validate the input length
-    // added for testing, but should be removed afterwards,
-    // because kmer is length checked when inserted into the db anyway
-    if (datalen > MAX_KMER_LENGTH)
-    {
-    	ereport(ERROR,
-   				(errcode(ERRCODE_STRING_DATA_RIGHT_TRUNCATION),
-   				 errmsg("KMer Sequence larger than maximum allowed length")));
-    }
-
-    Assert(datalen + VARHDRSZ_SHORT <= VARATT_SHORT_MAX);
-
-    kmer = (char *)palloc(datalen + VARHDRSZ);
-
-    // Check if the kmer structure uses the short or regular headers
-    if (datalen + VARHDRSZ_SHORT <= VARATT_SHORT_MAX) {
-        SET_VARSIZE_SHORT(kmer, datalen + VARHDRSZ_SHORT);
-        if (datalen)
-            memcpy(kmer + VARHDRSZ_SHORT, data, datalen);
-    } else {
-        SET_VARSIZE(kmer, datalen + VARHDRSZ);
-        memcpy(kmer + VARHDRSZ, data, datalen);
-    }
-
-    // Return the KMER structure as a Datum
-    return PointerGetDatum(kmer);
-}
-
-static int
-commonPrefix(const char *a, const char *b, int lena, int lenb) {
-    int i = 0;
-    while (i < lena && i < lenb && *a == *b)
-    {
-        a++;
-        b++;
-        i++;
-    }
-
-    return i;
-}
-
-/* qsort comparator to sort spgNodePtr structs by "c" */
-static int
-cmpNodePtr(const void *a, const void *b)
-{
-    const spgNodePtr *aa = (const spgNodePtr *)a;
-    const spgNodePtr *bb = (const spgNodePtr *)b;
-
-    if (aa->c < bb->c)
-        return -1;
-    else if (aa->c > bb->c)
-        return 1;
-    else
-        return 0;
-}
-
-static bool
-searchChar(Datum *nodeLabels, int nNodes, int16 c, int *i)
-{
-	int StopLow = 0,
-		StopHigh = nNodes;
-
-	while (StopLow < StopHigh)
-	{
-		int StopMiddle = (StopLow + StopHigh) >> 1;
-		int16 middle = DatumGetInt16(nodeLabels[StopMiddle]);
-
-		if (c < middle)
-			StopHigh = StopMiddle;
-		else if (c > middle)
-			StopLow = StopMiddle + 1;
-		else
-		{
-			*i = StopMiddle;
-			return true;
-		}
-	}
-
-	*i = StopHigh;
-	return false;
-}
-
 /*****************************************************************************/
 
 /*SP-Gist index functions implementation*/
+// Static information about the index implementation
 PG_FUNCTION_INFO_V1(kmer_config);
 Datum kmer_config(PG_FUNCTION_ARGS)
 {
-    spgConfigIn *in = (spgConfigIn *) PG_GETARG_POINTER(0);
+	spgConfigIn *in = (spgConfigIn *)PG_GETARG_POINTER(0);
 	spgConfigOut *cfg = (spgConfigOut *)PG_GETARG_POINTER(1);
 
 	cfg->prefixType = in->attType;
@@ -177,15 +83,16 @@ Datum kmer_config(PG_FUNCTION_ARGS)
 	PG_RETURN_VOID();
 }
 
+// Chooses a method for inserting a new value into an inner tuple 
 PG_FUNCTION_INFO_V1(kmer_choose);
 Datum kmer_choose(PG_FUNCTION_ARGS)
 {
 	spgChooseIn *in = (spgChooseIn *)PG_GETARG_POINTER(0);
 	spgChooseOut *out = (spgChooseOut *)PG_GETARG_POINTER(1);
 
-	KMER *inKmer = (KMER *) DatumGetPointer(in->datum);
+	KMER *inKmer = (KMER *)DatumGetPointer(in->datum);
 	char *inStr = VARDATA_ANY(inKmer);
-    int inSize = VARSIZE_ANY_EXHDR(inKmer);
+	int inSize = VARSIZE_ANY_EXHDR(inKmer);
 	char *prefixStr = NULL;
 	int prefixSize = 0;
 	int commonLen = 0;
@@ -197,7 +104,7 @@ Datum kmer_choose(PG_FUNCTION_ARGS)
 	{
 		KMER *prefixKmer = (KMER *)DatumGetPointer(in->prefixDatum);
 		prefixStr = VARDATA_ANY(prefixKmer);
-        prefixSize = VARSIZE_ANY_EXHDR(prefixKmer);
+		prefixSize = VARSIZE_ANY_EXHDR(prefixKmer);
 
 		commonLen = commonPrefix(inStr + in->level,
 								 prefixStr,
@@ -311,13 +218,14 @@ Datum kmer_choose(PG_FUNCTION_ARGS)
 	PG_RETURN_VOID();
 }
 
+// Decides how to create a new inner tuple over a set of leaf tuples
 PG_FUNCTION_INFO_V1(kmer_picksplit);
 Datum kmer_picksplit(PG_FUNCTION_ARGS)
 {
 	spgPickSplitIn *in = (spgPickSplitIn *)PG_GETARG_POINTER(0);
 	spgPickSplitOut *out = (spgPickSplitOut *)PG_GETARG_POINTER(1);
 
-	KMER *kmer0 = (KMER *) DatumGetPointer(in->datums[0]);
+	KMER *kmer0 = (KMER *)DatumGetPointer(in->datums[0]);
 	int i, commonLen;
 	spgNodePtr *nodes;
 
@@ -327,8 +235,8 @@ Datum kmer_picksplit(PG_FUNCTION_ARGS)
 	for (i = 1; i < in->nTuples && commonLen > 0; i++)
 	{
 		KMER *kmeri = (KMER *)DatumGetPointer(in->datums[i]);
-        int tmp = commonPrefix(VARDATA_ANY(kmer0), VARDATA_ANY(kmeri),
-                                             VARSIZE_ANY_EXHDR(kmer0), VARSIZE_ANY_EXHDR(kmeri));
+		int tmp = commonPrefix(VARDATA_ANY(kmer0), VARDATA_ANY(kmeri),
+							   VARSIZE_ANY_EXHDR(kmer0), VARSIZE_ANY_EXHDR(kmeri));
 		if (tmp < commonLen)
 			commonLen = tmp;
 	}
@@ -382,12 +290,15 @@ Datum kmer_picksplit(PG_FUNCTION_ARGS)
 			out->nNodes++;
 		}
 
-		if (commonLen < VARSIZE_ANY_EXHDR(kmeri)) {
+		if (commonLen < VARSIZE_ANY_EXHDR(kmeri))
+		{
 			leafD = formKmerDatum(VARDATA_ANY(kmeri) + commonLen + 1,
-                                                    VARSIZE_ANY_EXHDR(kmeri) - commonLen - 1);
-		} else {
+								  VARSIZE_ANY_EXHDR(kmeri) - commonLen - 1);
+		}
+		else
+		{
 			leafD = formKmerDatum(NULL, 0);
-        }
+		}
 
 		out->leafTupleDatums[nodes[i].i] = leafD;
 		out->mapTuplesToNodes[nodes[i].i] = out->nNodes - 1;
@@ -396,6 +307,7 @@ Datum kmer_picksplit(PG_FUNCTION_ARGS)
 	PG_RETURN_VOID();
 }
 
+// Returns set of nodes (branches) to follow during tree search
 PG_FUNCTION_INFO_V1(kmer_inner_consistent);
 Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 {
@@ -428,7 +340,7 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 	if (in->level)
 		memcpy(VARDATA(reconstrKmer), VARDATA(reconstructedValue), in->level);
 	if (prefixSize)
-		memcpy(((char *) VARDATA(reconstrKmer)) + in->level, VARDATA_ANY(prefixKmer), prefixSize);
+		memcpy(((char *)VARDATA(reconstrKmer)) + in->level, VARDATA_ANY(prefixKmer), prefixSize);
 
 	/* Initialize output arrays */
 	out->nodeNumbers = (int *)palloc(sizeof(int) * in->nNodes);
@@ -448,7 +360,7 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 			thisLen = maxReconstrLen - 1;
 		else
 		{
-			((unsigned char *) VARDATA(reconstrKmer))[maxReconstrLen - 1] = nodeChar;
+			((unsigned char *)VARDATA(reconstrKmer))[maxReconstrLen - 1] = nodeChar;
 			thisLen = maxReconstrLen;
 		}
 
@@ -464,41 +376,45 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 			/* Apply the strategy for comparisons */
 			switch (strategy)
 			{
-                case BTEqualStrategyNumber:
-                    inKmer = (KMER *)DatumGetPointer(arg);
-                    inSize = VARSIZE_ANY_EXHDR(inKmer);
-                    r = memcmp(VARDATA(reconstrKmer), VARDATA_ANY(inKmer), Min(inSize, thisLen));
-                    if (r != 0 || inSize < thisLen)
-                        res = false;
-                    break;
-                case RTContainsStrategyNumber:
-                    inQkmer = (QKMER *)DatumGetPointer(arg);
-                    inSize = VARSIZE_ANY_EXHDR(inQkmer);
-                    if (inSize < thisLen) {
-                        res = false;
-                    } else {
-                        char* qkmer_str = VARDATA_SHORT(inQkmer);
-                        char* kmer_str = VARDATA(reconstrKmer);
-                        for (int i = 0; i < Min(inSize, thisLen); i++) {
-                            if (!match(qkmer_str[i], kmer_str[i]))
-                            {
-                            	res = false;
-                            	break;
-                            }
-                        }
-                    }
+			case BTEqualStrategyNumber:
+				inKmer = (KMER *)DatumGetPointer(arg);
+				inSize = VARSIZE_ANY_EXHDR(inKmer);
+				r = memcmp(VARDATA(reconstrKmer), VARDATA_ANY(inKmer), Min(inSize, thisLen));
+				if (r != 0 || inSize < thisLen)
+					res = false;
+				break;
+			case RTContainsStrategyNumber:
+				inQkmer = (QKMER *)DatumGetPointer(arg);
+				inSize = VARSIZE_ANY_EXHDR(inQkmer);
+				if (inSize < thisLen)
+				{
+					res = false;
+				}
+				else
+				{
+					char *qkmer_str = VARDATA_SHORT(inQkmer);
+					char *kmer_str = VARDATA(reconstrKmer);
+					for (int i = 0; i < Min(inSize, thisLen); i++)
+					{
+						if (!match(qkmer_str[i], kmer_str[i]))
+						{
+							res = false;
+							break;
+						}
+					}
+				}
 
-                    break;
-                case RTPrefixStrategyNumber:
-                    inKmer = (KMER *)DatumGetPointer(arg);
-                    inSize = VARSIZE_ANY_EXHDR(inKmer);
-                    r = memcmp(VARDATA(reconstrKmer), VARDATA_ANY(inKmer), Min(inSize, thisLen));
-                    if (r != 0)
-                        res = false;
-                    break;
-                default:
-                    elog(ERROR, "unrecognized strategy number: %d", in->scankeys[j].sk_strategy);
-                    break;
+				break;
+			case RTPrefixStrategyNumber:
+				inKmer = (KMER *)DatumGetPointer(arg);
+				inSize = VARSIZE_ANY_EXHDR(inKmer);
+				r = memcmp(VARDATA(reconstrKmer), VARDATA_ANY(inKmer), Min(inSize, thisLen));
+				if (r != 0)
+					res = false;
+				break;
+			default:
+				elog(ERROR, "unrecognized strategy number: %d", in->scankeys[j].sk_strategy);
+				break;
 			}
 
 			if (!res)
@@ -521,6 +437,7 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 	PG_RETURN_VOID();
 }
 
+// Returns true if a leaf tuple satisfies a query
 PG_FUNCTION_INFO_V1(kmer_leaf_consistent);
 Datum kmer_leaf_consistent(PG_FUNCTION_ARGS)
 {
@@ -582,30 +499,30 @@ Datum kmer_leaf_consistent(PG_FUNCTION_ARGS)
 		/* Apply the comparison strategy */
 		switch (strategy)
 		{
-		    case BTEqualStrategyNumber:
-		        query = (KMER *) DatumGetPointer(arg);
-                queryLen = VARSIZE_ANY_EXHDR(query);
-                r = memcmp(fullValue, VARDATA_ANY(query), Min(queryLen, fullLen));
-                res = (queryLen == fullLen) && (r == 0);
-                break;
-            case RTPrefixStrategyNumber:
-                query = (KMER *) DatumGetPointer(arg);
-                queryLen = VARSIZE_ANY_EXHDR(query);
-                res = (level >= queryLen) ||
-                    DatumGetBool(DirectFunctionCall2(kmer_starts_with,
-                                                        PointerGetDatum(query),
-                                                        out->leafValue));
-                break;
-            case RTContainsStrategyNumber:
-                patternQuery = (QKMER *) DatumGetPointer(arg);
-                res = DatumGetBool(DirectFunctionCall2(kmer_contains,
-                                                           PointerGetDatum(patternQuery),
-                                                           out->leafValue));
-                break;
-		    default:
-		    	elog(ERROR, "unrecognized strategy number: %d", in->scankeys[j].sk_strategy);
-		    	res = false;
-		    	break;
+		case BTEqualStrategyNumber:
+			query = (KMER *)DatumGetPointer(arg);
+			queryLen = VARSIZE_ANY_EXHDR(query);
+			r = memcmp(fullValue, VARDATA_ANY(query), Min(queryLen, fullLen));
+			res = (queryLen == fullLen) && (r == 0);
+			break;
+		case RTPrefixStrategyNumber:
+			query = (KMER *)DatumGetPointer(arg);
+			queryLen = VARSIZE_ANY_EXHDR(query);
+			res = (level >= queryLen) ||
+				  DatumGetBool(DirectFunctionCall2(kmer_starts_with,
+												   PointerGetDatum(query),
+												   out->leafValue));
+			break;
+		case RTContainsStrategyNumber:
+			patternQuery = (QKMER *)DatumGetPointer(arg);
+			res = DatumGetBool(DirectFunctionCall2(kmer_contains,
+												   PointerGetDatum(patternQuery),
+												   out->leafValue));
+			break;
+		default:
+			elog(ERROR, "unrecognized strategy number: %d", in->scankeys[j].sk_strategy);
+			res = false;
+			break;
 		}
 
 		/* Exit early if any condition fails */

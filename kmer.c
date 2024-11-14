@@ -3,11 +3,11 @@
  */
 
 #include "kmer.h"
-
 #include "fmgr.h"
 #include "funcapi.h"
 #include <ctype.h>
 #include "access/spgist.h"
+#include "access/hash.h"
 #include "catalog/pg_type.h"
 #include "utils/builtins.h"
 #include "utils/elog.h"
@@ -15,48 +15,6 @@
 PG_MODULE_MAGIC;
 
 /*****************************************************************************/
-
-/* Helper Function to Validate the DNA Sequence for A,C,G and T characters */
-
-static inline void validate_sequence(char *input)
-{
-
-	char *ptr = input;
-	char c;
-
-	for (ptr = input; *ptr; ptr++)
-	{
-		c = tolower(*ptr);
-		*ptr = c;
-
-		if ((c != 'a') && (c != 'c') && (c != 'g') && (c != 't'))
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-					 errmsg("Invalid DNA Sequence"),
-					 errdetail("Valid characters are A, C, G, T (case-insensitive).")));
-		}
-	}
-
-	return;
-}
-
-/* Helper function to compare two kmer sequences */
-static int
-kmer_compare(const KMER *a, const KMER *b)
-{
-    int min_len = Min(VARSIZE_ANY_EXHDR(a), VARSIZE_ANY_EXHDR(b));
-    int cmp = memcmp(VARDATA_ANY(a), VARDATA_ANY(b), min_len);
-
-    if (cmp != 0) {
-        return cmp;
-    } else {
-        /* If sequences are equal up to min_len, shorter kmer is considered smaller */
-        if (VARSIZE_ANY_EXHDR(a) < VARSIZE_ANY_EXHDR(b)) return -1;
-        else if (VARSIZE_ANY_EXHDR(a) > VARSIZE_ANY_EXHDR(b)) return 1;
-        else return 0;
-    }
-}
 
 /* DNA Input and Output Functions */
 PG_FUNCTION_INFO_V1(dna_in);
@@ -83,20 +41,20 @@ Datum dna_out(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(kmer_in);
 Datum kmer_in(PG_FUNCTION_ARGS)
 {
-    char *input = PG_GETARG_CSTRING(0);
-    int len = strlen(input);
+	char *input = PG_GETARG_CSTRING(0);
+	int len = strlen(input);
 
-    if (len > MAX_KMER_LENGTH)
-   	{
-   		ereport(ERROR,
-   				(errcode(ERRCODE_STRING_DATA_RIGHT_TRUNCATION),
-   				 errmsg("KMer Sequence larger than length 32")));
-   	}
+	if (len > MAX_KMER_LENGTH)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_STRING_DATA_RIGHT_TRUNCATION),
+				 errmsg("KMer Sequence larger than length 32")));
+	}
 
-    validate_sequence(input);
+	validate_sequence(input);
 
-    KMER *result = (KMER *)cstring_to_text(input);
-    PG_RETURN_POINTER(result);
+	KMER *result = (KMER *)cstring_to_text(input);
+	PG_RETURN_POINTER(result);
 }
 
 PG_FUNCTION_INFO_V1(kmer_out);
@@ -231,47 +189,6 @@ Datum kmer_starts_with_op(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(result);
 }
 
-/* kmer_lt: Returns true if a < b */
-PG_FUNCTION_INFO_V1(kmer_lt);
-Datum kmer_lt(PG_FUNCTION_ARGS)
-{
-    KMER *a = (KMER *) PG_GETARG_POINTER(0);
-    KMER *b = (KMER *) PG_GETARG_POINTER(1);
-
-    PG_RETURN_BOOL(kmer_compare(a, b) < 0);
-}
-
-/* kmer_le: Returns true if a <= b */
-PG_FUNCTION_INFO_V1(kmer_le);
-Datum kmer_le(PG_FUNCTION_ARGS)
-{
-    KMER *a = (KMER *) PG_GETARG_POINTER(0);
-    KMER *b = (KMER *) PG_GETARG_POINTER(1);
-
-    PG_RETURN_BOOL(kmer_compare(a, b) <= 0);
-}
-
-/* kmer_gt: Returns true if a > b */
-PG_FUNCTION_INFO_V1(kmer_gt);
-Datum kmer_gt(PG_FUNCTION_ARGS)
-{
-    KMER *a = (KMER *) PG_GETARG_POINTER(0);
-    KMER *b = (KMER *) PG_GETARG_POINTER(1);
-
-    PG_RETURN_BOOL(kmer_compare(a, b) > 0);
-}
-
-/* kmer_ge: Returns true if a >= b */
-PG_FUNCTION_INFO_V1(kmer_ge);
-Datum kmer_ge(PG_FUNCTION_ARGS)
-{
-    KMER *a = (KMER *) PG_GETARG_POINTER(0);
-    KMER *b = (KMER *) PG_GETARG_POINTER(1);
-
-    PG_RETURN_BOOL(kmer_compare(a, b) >= 0);
-}
-
-
 // generate kmer function
 // https://www.postgresql.org/docs/current/xfunc-c.html#XFUNC-C-RETURN-SET
 PG_FUNCTION_INFO_V1(generate_kmers);
@@ -338,22 +255,16 @@ Datum generate_kmers(PG_FUNCTION_ARGS)
 	}
 }
 
-PG_FUNCTION_INFO_V1(kmer_cmp);
-Datum kmer_cmp(PG_FUNCTION_ARGS)
+// Hash Index
+PG_FUNCTION_INFO_V1(kmer_hash);
+Datum kmer_hash(PG_FUNCTION_ARGS)
 {
-	KMER *kmer1 = (KMER *)PG_GETARG_POINTER(0);
-	KMER *kmer2 = (KMER *)PG_GETARG_POINTER(1);
+	KMER *kmer = (KMER *)PG_GETARG_POINTER(0);
+	int len = VARSIZE_ANY_EXHDR(kmer);
+	Datum result;
 
-	int len1 = VARSIZE_ANY_EXHDR(kmer1);
-	int len2 = VARSIZE_ANY_EXHDR(kmer2);
+	/* Use the built-in hash function on the entire KMER contents */
+	result = hash_any((unsigned char *)VARDATA_ANY(kmer), len);
 
-	// First compare the lengths
-	if (len1 > len2)
-		PG_RETURN_INT32(1);
-	else if (len1 < len2)
-		PG_RETURN_INT32(-1);
-
-	// If lengths are equal, compare the sequences
-
-	PG_RETURN_INT32(0);
+	PG_RETURN_DATUM(result);
 }

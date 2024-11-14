@@ -5,19 +5,43 @@
 #include "postgres.h"
 #include "utils/varlena.h"
 
-/* DNA Sequence Type */
+// DNA Sequence Type
 typedef struct varlena DNA;
 
-/* K-mer Type */
+// K-mer Type
 typedef struct varlena KMER;
 
-/* Query K-mer Type */
+// Query K-mer Type
 typedef struct varlena QKMER;
 
-/* Maximum length for kmer and qkmer types */
+// Maximum length for kmer and qkmer types
 #define MAX_KMER_LENGTH 32
 
-/* Helper Function to  match the possible DNA sequences for a given QKMer */
+// Helper Function to Validate the DNA Sequence for A,C,G and T characters
+static inline void validate_sequence(char *input)
+{
+
+	char *ptr = input;
+	char c;
+
+	for (ptr = input; *ptr; ptr++)
+	{
+		c = tolower(*ptr);
+		*ptr = c;
+
+		if ((c != 'a') && (c != 'c') && (c != 'g') && (c != 't'))
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+					 errmsg("Invalid DNA Sequence"),
+					 errdetail("Valid characters are A, C, G, T (case-insensitive).")));
+		}
+	}
+
+	return;
+}
+
+// Helper Function to  match the possible DNA sequences for a given QKMer
 static inline bool
 match(char pattern, char nucleotide)
 {
