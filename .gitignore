@@ -1,2 +1,7 @@
 kmer.o
 kmer.so
+kmer.bc
+kmer_spgist.o
+kmer_spgist.bc
+
+
