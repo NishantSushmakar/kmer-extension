@@ -1,5 +1,9 @@
 /*
  * kmer_spgist.c
+ *
+ * References:
+ * Postgres Trie-based SP-GiST Index for Text: https://doxygen.postgresql.org/spgtextproc_8c_source.html
+ * SP-GiST Documentation: https://www.postgresql.org/docs/current/spgist.html
  */
 
 #include "kmer_spgist.h"
@@ -15,6 +19,37 @@
 #include "funcapi.h"
 
 /*****************************************************************************/
+
+// TODO: Make a common function for contains and containing, call from headers
+
+// Containing function
+PG_FUNCTION_INFO_V1(kmer_containing);
+Datum kmer_containing(PG_FUNCTION_ARGS)
+{
+	KMER *kmer = (KMER *)PG_GETARG_POINTER(0);
+	QKMER *qkmer = (QKMER *)PG_GETARG_POINTER(1);
+
+	int len1 = VARSIZE_ANY_EXHDR(qkmer);
+	int len2 = VARSIZE_ANY_EXHDR(kmer);
+
+	// if length of Qkmer and kmer are not equal then is not a match
+	if (len1 != len2)
+		PG_RETURN_BOOL(false);
+
+	char *qkmer_str = VARDATA_ANY(qkmer);
+	char *kmer_str = VARDATA_ANY(kmer);
+
+	// compare every qkmer char to see if is a corresponding match to a kmer
+	for (int i = 0; i < len1; i++)
+	{
+		if (!match(qkmer_str[i], kmer_str[i]))
+		{
+			PG_RETURN_BOOL(false);
+		}
+	}
+
+	PG_RETURN_BOOL(true);
+}
 
 // Contains function
 PG_FUNCTION_INFO_V1(kmer_contains);
@@ -392,8 +427,8 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 				}
 				else
 				{
-					char *qkmer_str = VARDATA_SHORT(inQkmer);
-					char *kmer_str = VARDATA(reconstrKmer);
+					char *qkmer_str = VARDATA_ANY(inQkmer);
+					char *kmer_str = VARDATA_ANY(reconstrKmer);
 					for (int i = 0; i < Min(inSize, thisLen); i++)
 					{
 						if (!match(qkmer_str[i], kmer_str[i]))
@@ -515,9 +550,11 @@ Datum kmer_leaf_consistent(PG_FUNCTION_ARGS)
 			break;
 		case RTContainsStrategyNumber:
 			patternQuery = (QKMER *)DatumGetPointer(arg);
-			res = DatumGetBool(DirectFunctionCall2(kmer_contains,
-												   PointerGetDatum(patternQuery),
-												   out->leafValue));
+			queryLen = VARSIZE_ANY_EXHDR(patternQuery);
+			res = (queryLen == fullLen) &&
+			    DatumGetBool(DirectFunctionCall2(kmer_contains,
+				                                PointerGetDatum(patternQuery),
+				                                out->leafValue));
 			break;
 		default:
 			elog(ERROR, "unrecognized strategy number: %d", in->scankeys[j].sk_strategy);
