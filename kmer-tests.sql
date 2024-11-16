@@ -31,6 +31,7 @@ CREATE TABLE dna_kmer_test (
     CREATE INDEX kmer_index ON dna_kmer_test USING spgist (kmer_sequence);
 
 -- SEARCH with index
+    SET enable_seqscan = off;
     SELECT * FROM dna_kmer_test WHERE kmer_sequence = 'AGCTAGCT'::kmer;
 
 -- ########################################################################
