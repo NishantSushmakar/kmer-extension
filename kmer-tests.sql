@@ -33,6 +33,10 @@ CREATE TABLE dna_kmer_test (
 -- SEARCH with index
     SET enable_seqscan = off;
     SELECT * FROM dna_kmer_test WHERE kmer_sequence = 'AGCTAGCT'::kmer;
+    SELECT * FROM dna_kmer_test WHERE kmer_sequence ^@ 'ACG';
+    SELECT * FROM dna_kmer_test WHERE 'ANGTA'::qkmer @> kmer_sequence;
+    SELECT * FROM dna_kmer_test WHERE 'ACGNN'::qkmer @> kmer_sequence;
+
 
 -- ########################################################################
 
@@ -330,30 +334,44 @@ CREATE TABLE dna_kmer_test (
     SELECT contains('RCGT'::qkmer, 'ACGT'::dna); -- Error: Data type mismatch
     SELECT contains('ACGT'::qkmer, 'ACGT'::dna); -- Error: Data type mismatch
 
--- Inner Join: Compute the inner join fo two different generated kmers
--- It should return 6 rows: ACGT, CGTA, GTAC, TACG, TACGT, GTAC
-    SELECT a.qkmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(qkmer)
-    INNER JOIN generate_kmers('GTACGTAC'::dna, 4) AS b(kmer) ON contains(a.qkmer, b.kmer); 
+-- Joins
+    WITH qkmer_values AS (
+        SELECT * FROM (VALUES 
+            ('ANGTA'::qkmer),  --  5-mer starting with A, followed by any other nucleotide and then G, T and A
+            ('CYGTT'::qkmer),  --  5-mer starting with C, followed by C or T and then G, T and T
+            ('TGNNN'::qkmer),  --  5-mer starting with T, G, and then any 3 of all posible nucleotides
+            ('ACGTA'::qkmer)   
+        ) AS q(qkmer)
+    ),
+    kmer_values AS (
+        SELECT * FROM (VALUES 
+            ('AGGTA'::kmer),  -- Matches ANGTA
+            ('CCGTT'::kmer),  -- Matches CYGTT
+            ('TGGCA'::kmer),  -- Matches TGNNN
+            ('ACGTA'::kmer),  -- Matches  ACGTA
+            ('TTTAA'::kmer)   -- Does not match any value
+        ) AS k(kmer)
+    )
 
--- Left Join
--- It should return 5 rows, 2 non null for ACGT and 3 null for the CGTA, GTAC, TAGC
-    SELECT a.qkmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(qkmer)
-    LEFT JOIN generate_kmers('AGACGTTG'::dna, 4) AS b(kmer) ON contains(a.qkmer, b.kmer); 
+    -- Inner Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA)
+    SELECT q.qkmer, k.kmer
+    FROM qkmer_values q
+    INNER JOIN kmer_values k ON contains(q.qkmer, k.kmer);
 
--- Right Join
--- It should return 6 rows, 2 non null for ACGT and 3 null for the AGAC, GACG, CGTT, GTTG
-    SELECT a.qkmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(qkmer)
-    RIGHT JOIN generate_kmers('AGACGTTG'::dna, 4) AS b(kmer) ON contains(a.qkmer, b.kmer); 
+    -- Implicit Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA)
+    SELECT q.qkmer, k.kmer
+    FROM qkmer_values q, kmer_values k
+    WHERE contains(q.qkmer, k.kmer);
 
--- Implicit join
--- It should return 6 rows: ACGT, CGTA, GTAC, TACG, TACGT, GTAC
-    SELECT a.qkmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(qkmer),  
-        generate_kmers('GTACGTAC'::dna, 4) AS b(kmer) 
-    WHERE contains(a.qkmer, b.kmer); 
+    -- Left Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA)
+    SELECT q.qkmer, k.kmer
+    FROM qkmer_values q
+    LEFT JOIN kmer_values k ON contains(q.qkmer, k.kmer);
+
+    -- Right Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA), (NULL, TTTAA)
+    SELECT q.qkmer, k.kmer
+    FROM qkmer_values q
+    RIGHT JOIN kmer_values k ON contains(q.qkmer, k.kmer);
 
 -- ########################################################################
 
@@ -380,34 +398,48 @@ CREATE TABLE dna_kmer_test (
     SELECT 'ACGTACGT'::qkmer @> 'AC'::kmer; -- Return false
 
 -- Data type mismatch.
-    SELECT 'RCGT'::qkmer @> 'ACGT'::dna; -- Error: Data type mismatch
-    SELECT 'ACGT'::qkmer @> 'ACGT'::dna; -- Error: Data type mismatch
+    SELECT 'RCGT'::qkmer @> 'ACGT'::kmer; -- Error: Data type mismatch
+    SELECT 'ACGT'::qkmer @> 'ACGT'::kmer; -- Error: Data type mismatch
 
 
--- Inner Join: Compute the inner join fo two different generated kmers
--- It should return 6 rows: ACGT, CGTA, GTAC, TACG, TACGT, GTAC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    INNER JOIN generate_kmers('GTACGTAC'::dna, 4) AS b(kmer) ON a.kmer @> b.kmer; 
+-- Joins
+    WITH qkmer_values AS (
+        SELECT * FROM (VALUES 
+            ('ANGTA'::qkmer),  --  5-mer starting with A, followed by any other nucleotide and then G, T and A
+            ('CYGTT'::qkmer),  --  5-mer starting with C, followed by C or T and then G, T and T
+            ('TGNNN'::qkmer),  --  5-mer starting with T, G, and then any 3 of all posible nucleotides
+            ('ACGTA'::qkmer)   
+        ) AS q(qkmer)
+    ),
+    kmer_values AS (
+        SELECT * FROM (VALUES 
+            ('AGGTA'::kmer),  -- Matches ANGTA
+            ('CCGTT'::kmer),  -- Matches CYGTT
+            ('TGGCA'::kmer),  -- Matches TGNNN
+            ('ACGTA'::kmer),  -- Matches  ACGTA
+            ('TTTAA'::kmer)   -- Does not match any value
+        ) AS k(kmer)
+    )
 
--- Left Join
--- It should return 5 rows, 2 non null for ACGT and 3 null for the CGTA, GTAC, TAGC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    LEFT JOIN generate_kmers('AGACGTTG'::dna, 4) AS b(kmer) ON a.kmer @> b.kmer; 
+    -- Inner Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA)
+    SELECT q.qkmer, k.kmer
+    FROM qkmer_values q
+    INNER JOIN kmer_values k ON q.qkmer @> k.kmer;
 
--- Right Join
--- It should return 6 rows, 2 non null for ACGT and 3 null for the AGAC, GACG, CGTT, GTTG
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    RIGHT JOIN generate_kmers('AGACGTTG'::dna, 4) AS b(kmer) ON a.kmer @> b.kmer; 
+    -- Implicit Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA)
+    SELECT q.qkmer, k.kmer
+    FROM qkmer_values q, kmer_values k
+    WHERE q.qkmer @> k.kmer;
 
--- Implicit join
--- It should return 6 rows: ACGT, CGTA, GTAC, TACG, TACGT, GTAC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer),  
-        generate_kmers('GTACGTAC'::dna, 4) AS b(kmer) 
-    WHERE a.kmer @> b.kmer; 
+    -- Left Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA)
+    SELECT q.qkmer, k.kmer
+    FROM qkmer_values q
+    LEFT JOIN kmer_values k ON q.qkmer @> k.kmer;
+
+    -- Right Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA), (NULL, TTTAA)
+    SELECT q.qkmer, k.kmer
+    FROM qkmer_values q
+    RIGHT JOIN kmer_values k ON q.qkmer @> k.kmer;
 
 -- ########################################################################
 

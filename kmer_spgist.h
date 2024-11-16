@@ -4,7 +4,7 @@
 
 #include "postgres.h"
 #include "utils/varlena.h"
-#include <varatt.h>
+//#include <varatt.h>
 
 // Struct for sorting values in picksplit
 typedef struct spgNodePtr
