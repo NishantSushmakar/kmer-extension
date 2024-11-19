@@ -177,6 +177,18 @@ CREATE OPERATOR CLASS kmer_spgist_ops
     FUNCTION 4 kmer_inner_consistent(internal, internal),
     FUNCTION 5 kmer_leaf_consistent(internal, internal);
 
+-- Comparison function for B-tree support
+CREATE FUNCTION cmp(kmer, kmer)
+    RETURNS integer
+    AS 'MODULE_PATHNAME', 'kmer_cmp'
+    LANGUAGE C IMMUTABLE STRICT;
+
+-- Create the operator class for B-tree support
+CREATE OPERATOR CLASS kmer_btree_ops
+    DEFAULT FOR TYPE kmer USING btree AS
+        OPERATOR        3       = ,
+        FUNCTION        1       cmp(kmer, kmer);
+
 -- Create the operator class for hash support
 CREATE OPERATOR CLASS kmer_hash_ops
     DEFAULT FOR TYPE kmer USING hash AS

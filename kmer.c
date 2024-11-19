@@ -255,16 +255,37 @@ Datum generate_kmers(PG_FUNCTION_ARGS)
 	}
 }
 
-// Hash Index
-PG_FUNCTION_INFO_V1(kmer_hash);
-Datum kmer_hash(PG_FUNCTION_ARGS)
+PG_FUNCTION_INFO_V1(kmer_cmp);
+Datum
+kmer_cmp(PG_FUNCTION_ARGS)
 {
-	KMER *kmer = (KMER *)PG_GETARG_POINTER(0);
-	int len = VARSIZE_ANY_EXHDR(kmer);
-	Datum result;
+    KMER *kmer1 = (KMER *) PG_GETARG_POINTER(0);
+    KMER *kmer2 = (KMER *) PG_GETARG_POINTER(1);
+    
+    int len1 = VARSIZE_ANY_EXHDR(kmer1);
+    int len2 = VARSIZE_ANY_EXHDR(kmer2);
+    
+    // First compare the lengths
+    if (len1 > len2)
+        PG_RETURN_INT32(1);
+    else if (len1 < len2)
+        PG_RETURN_INT32(-1);    
+    
+    // If lengths are equal, compare the sequences
+    
+    PG_RETURN_INT32(0);
+}
 
-	/* Use the built-in hash function on the entire KMER contents */
-	result = hash_any((unsigned char *)VARDATA_ANY(kmer), len);
-
-	PG_RETURN_DATUM(result);
+PG_FUNCTION_INFO_V1(kmer_hash);
+Datum
+kmer_hash(PG_FUNCTION_ARGS)
+{
+    KMER *kmer = (KMER *) PG_GETARG_POINTER(0);
+    int len = VARSIZE_ANY_EXHDR(kmer);
+    Datum result;
+    
+    /* Use the built-in hash function on the entire KMER contents */
+    result = hash_any((unsigned char *) VARDATA_ANY(kmer), len);
+    
+    PG_RETURN_DATUM(result);
 }
