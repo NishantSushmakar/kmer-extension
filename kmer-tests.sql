@@ -1,25 +1,15 @@
 -- ################################## INSERTION, DELETION, SEARCH & INDEXING #######################################
 
 CREATE TABLE dna_kmer_test (
-    id SERIAL PRIMARY KEY,
-    dna_sequence dna,
-    kmer_sequence kmer,
-    qkmer_sequence qkmer
+    dna dna,
+    kmer kmer,
+    qkmer qkmer
 );
 
--- INSERTION
-    INSERT INTO dna_kmer_test (dna_sequence, kmer_sequence, qkmer_sequence)
-    VALUES
-        ('AGCTAGCTAGCTAGCT', 'AGCTAGCT', 'AGCTAGCT'), 
-        ('CGTACGTACGTA', 'CGTACGTA', 'CGTACGTA'),      
-        ('TTTTTTTTTTTTTTTT', 'TTTTTTTT', 'TTTTTTTT'), 
-        ('AGTAGC', 'AGTAGC', 'AGTAGC');                
-
--- INSERTION with wrong values
-    INSERT INTO dna_kmer_test (dna_sequence, kmer_sequence, qkmer_sequence)
-    VALUES 
-        ('AGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCT', 'AGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGC', 'AGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGC'),  -- Too long
-        ('GATTACA', 'GATTACAX', 'GATTACAX');  -- Invalid character in kmer and qkmer
+COPY dna_kmer_test(dna, kmer, qkmer)
+FROM '/path/to/your/sequences.csv'
+DELIMITER ','
+CSV HEADER;
 
 -- DELETION
     DELETE FROM dna_kmer_test WHERE kmer_sequence = 'CGTACGTA'::kmer;

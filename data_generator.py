@@ -1,24 +1,34 @@
 import random
+import pandas as pd
 
-# Define possible characters for each sequence type
+def generate_sequence(chars, max_length=32):
+    length = random.randint(1, max_length)
+    return ''.join(random.choices(chars, k=length))
+
+
+def generate_dataset(n, chars, max_length=32, max_duplicates=20):
+    unique_values = []
+    final_values = []
+
+    seq_length = random.randint(1, 50)
+    for _ in range(n // 2):  # Start with half unique values
+        unique_values.append(generate_sequence(chars, max_length))
+
+    for value in unique_values:
+        num_duplicates = random.randint(1, max_duplicates)
+        final_values.extend([value] * num_duplicates)
+
+    random.shuffle(final_values)
+
+    return final_values[:n]
+
 dna_chars = ['A', 'C', 'G', 'T']
 kmer_chars = ['A', 'C', 'G', 'T']
 qkmer_chars = ['A', 'C', 'G', 'T', 'R', 'Y', 'K', 'M', 'S', 'W', 'B', 'D', 'H', 'V']
 
-# Function to generate a random sequence
-def generate_sequence(chars, max_length):
-    length = random.randint(1, max_length)
-    return ''.join(random.choices(chars, k=length))
-
-# Generate 1000 rows of SQL values
-values = []
-dna_length = random.randint(1, 50)
-for _ in range(1000):
-    dna_sequence = generate_sequence(dna_chars, dna_length)
-    kmer_sequence = generate_sequence(kmer_chars, 32)
-    qkmer_sequence = generate_sequence(qkmer_chars, 32)
-    values.append(f"('{dna_sequence}', '{kmer_sequence}', '{qkmer_sequence}')")
-
-# Print the SQL
-print("INSERT INTO dna_kmer_test (dna_sequence, kmer_sequence, qkmer_sequence) VALUES")
-print(",\n".join(values) + ";")
+n = 100000
+dna = pd.DataFrame(generate_dataset(n, dna_chars, max_length=100), columns = ["dna"])
+kmer = pd.DataFrame(generate_dataset(n, kmer_chars), columns = ["kmer"])
+qkmer = pd.DataFrame(generate_dataset(n, qkmer_chars), columns = ["qkmer"])
+data = pd.concat([dna, kmer, qkmer], axis = 1)
+data
