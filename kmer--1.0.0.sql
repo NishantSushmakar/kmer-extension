@@ -72,27 +72,27 @@ CREATE FUNCTION length(qkmer)
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 
 -- Comparison functions
-CREATE FUNCTION kmer_equals(kmer, kmer)
+CREATE FUNCTION equals(kmer, kmer)
     RETURNS boolean
     AS 'MODULE_PATHNAME', 'kmer_equals'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 
-CREATE FUNCTION kmer_starts_with(kmer, kmer)
+CREATE FUNCTION starts_with(kmer, kmer)
     RETURNS boolean
     AS 'MODULE_PATHNAME', 'kmer_starts_with'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 
-CREATE FUNCTION kmer_starts_with_op(kmer,kmer)
+CREATE FUNCTION starts_with_op(kmer,kmer)
     RETURNS boolean
     AS 'MODULE_PATHNAME', 'kmer_starts_with_op'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 
-CREATE FUNCTION kmer_contains(qkmer,kmer)
+CREATE FUNCTION contains(qkmer,kmer)
     RETURNS boolean
     AS 'MODULE_PATHNAME', 'kmer_contains'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
 
-CREATE FUNCTION kmer_containing(kmer,qkmer)
+CREATE FUNCTION containing(kmer,qkmer)
     RETURNS boolean
     AS 'MODULE_PATHNAME', 'kmer_containing'
     LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE;
@@ -140,21 +140,21 @@ CREATE FUNCTION hash(kmer)
 CREATE OPERATOR = (
   LEFTARG = kmer,
   RIGHTARG = kmer,
-  PROCEDURE = kmer_equals,
+  PROCEDURE = equals,
   COMMUTATOR = '='
 );
 -- Starts with Operator
 CREATE OPERATOR ^@ (
     LEFTARG = kmer,
     RIGHTARG = kmer,
-    PROCEDURE = kmer_starts_with_op
+    PROCEDURE = starts_with_op
 );
 
 -- Containing Operator
 CREATE OPERATOR <@ (
     LEFTARG = kmer,
     RIGHTARG = qkmer,
-    PROCEDURE = kmer_containing,
+    PROCEDURE = containing,
     COMMUTATOR = '@>'
 );
 
@@ -162,7 +162,7 @@ CREATE OPERATOR <@ (
 CREATE OPERATOR @> (
     LEFTARG = qkmer,
     RIGHTARG = kmer,
-    PROCEDURE = kmer_contains,
+    PROCEDURE = contains,
     COMMUTATOR = '<@'
 );
 
