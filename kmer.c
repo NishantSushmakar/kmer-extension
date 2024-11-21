@@ -31,7 +31,7 @@ Datum dna_in(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(dna_out);
 Datum dna_out(PG_FUNCTION_ARGS)
 {
-	DNA *dna = (DNA *)PG_GETARG_POINTER(0);
+	DNA *dna = (DNA *)PG_GETARG_VARLENA_P(0);
 	char *result = psprintf("%.*s", VARSIZE_ANY_EXHDR(dna), VARDATA_ANY(dna));
 
 	PG_RETURN_CSTRING(result);
@@ -53,14 +53,17 @@ Datum kmer_in(PG_FUNCTION_ARGS)
 
 	validate_sequence(input);
 
-	KMER *result = (KMER *)cstring_to_text(input);
+	KMER *result = (KMER *)palloc(len + VARHDRSZ_SHORT);
+    SET_VARSIZE_SHORT(result, len + VARHDRSZ_SHORT);
+    if (len) memcpy(VARDATA_ANY(result), input, len);
+
 	PG_RETURN_POINTER(result);
 }
 
 PG_FUNCTION_INFO_V1(kmer_out);
 Datum kmer_out(PG_FUNCTION_ARGS)
 {
-	KMER *kmer = (KMER *)PG_GETARG_POINTER(0);
+	KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(0);
 	char *result = psprintf("%.*s", VARSIZE_ANY_EXHDR(kmer), VARDATA_ANY(kmer));
 
 	PG_RETURN_CSTRING(result);
@@ -111,14 +114,17 @@ Datum qkmer_in(PG_FUNCTION_ARGS)
 		}
 	}
 
-	QKMER *result = (QKMER *)cstring_to_text(input);
+    QKMER *result = (QKMER *)palloc(len + VARHDRSZ_SHORT);
+    SET_VARSIZE_SHORT(result, len + VARHDRSZ_SHORT);
+    if (len) memcpy(VARDATA_ANY(result), input, len);
+
 	PG_RETURN_POINTER(result);
 }
 
 PG_FUNCTION_INFO_V1(qkmer_out);
 Datum qkmer_out(PG_FUNCTION_ARGS)
 {
-	QKMER *qkmer = (QKMER *)PG_GETARG_POINTER(0);
+	QKMER *qkmer = (QKMER *)PG_GETARG_VARLENA_P(0);
 	char *result = psprintf("%.*s", VARSIZE_ANY_EXHDR(qkmer), VARDATA_ANY(qkmer));
 
 	PG_RETURN_CSTRING(result);
@@ -128,21 +134,21 @@ Datum qkmer_out(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(dna_length);
 Datum dna_length(PG_FUNCTION_ARGS)
 {
-	DNA *dna = (DNA *)PG_GETARG_POINTER(0);
+	DNA *dna = (DNA *)PG_GETARG_VARLENA_P(0);
 	PG_RETURN_INT32(VARSIZE_ANY_EXHDR(dna));
 }
 
 PG_FUNCTION_INFO_V1(kmer_length);
 Datum kmer_length(PG_FUNCTION_ARGS)
 {
-	KMER *kmer = (KMER *)PG_GETARG_POINTER(0);
+	KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(0);
 	PG_RETURN_INT32(VARSIZE_ANY_EXHDR(kmer));
 }
 
 PG_FUNCTION_INFO_V1(qkmer_length);
 Datum qkmer_length(PG_FUNCTION_ARGS)
 {
-	QKMER *qkmer = (QKMER *)PG_GETARG_POINTER(0);
+	QKMER *qkmer = (QKMER *)PG_GETARG_VARLENA_P(0);
 	PG_RETURN_INT32(VARSIZE_ANY_EXHDR(qkmer));
 }
 
@@ -152,8 +158,8 @@ Datum qkmer_length(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(kmer_equals);
 Datum kmer_equals(PG_FUNCTION_ARGS)
 {
-	KMER *kmer1 = (KMER *)PG_GETARG_POINTER(0);
-	KMER *kmer2 = (KMER *)PG_GETARG_POINTER(1);
+	KMER *kmer1 = (KMER *)PG_GETARG_VARLENA_P(0);
+	KMER *kmer2 = (KMER *)PG_GETARG_VARLENA_P(1);
 
 	// If either of the value is null return false
 	if (PG_ARGISNULL(0) || PG_ARGISNULL(1))
@@ -174,8 +180,8 @@ Datum kmer_equals(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(kmer_starts_with_op);
 Datum kmer_starts_with_op(PG_FUNCTION_ARGS)
 {
-	KMER *kmer = (KMER *)PG_GETARG_POINTER(0);
-	KMER *prefix = (KMER *)PG_GETARG_POINTER(1);
+	KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(0);
+	KMER *prefix = (KMER *)PG_GETARG_VARLENA_P(1);
 
 	int len1 = VARSIZE_ANY_EXHDR(prefix);
 	int len2 = VARSIZE_ANY_EXHDR(kmer);
@@ -207,7 +213,7 @@ Datum generate_kmers(PG_FUNCTION_ARGS)
 		funcctx = SRF_FIRSTCALL_INIT();
 		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
 
-		DNA *dna = (DNA *)PG_GETARG_POINTER(0);
+		DNA *dna = (DNA *)PG_GETARG_VARLENA_P(0);
 		int window_size = PG_GETARG_INT32(1);
 
 		int len_dna = VARSIZE_ANY_EXHDR(dna);
@@ -243,9 +249,9 @@ Datum generate_kmers(PG_FUNCTION_ARGS)
 		char *dna_sequence = ((struct { char *sequence; int k_size; } *)funcctx->user_fctx)->sequence;
 		int window_size = ((struct { char *sequence; int k_size; } *)funcctx->user_fctx)->k_size;
 
-		KMER *kmer = (KMER *)palloc(VARHDRSZ + window_size);
-		SET_VARSIZE(kmer, VARHDRSZ + window_size);
-		memcpy(VARDATA(kmer), dna_sequence + call_cntr, window_size);
+		KMER *kmer = (KMER *)palloc(VARHDRSZ_SHORT + window_size);
+		SET_VARSIZE_SHORT(kmer, VARHDRSZ_SHORT + window_size);
+		memcpy(VARDATA_ANY(kmer), dna_sequence + call_cntr, window_size);
 
 		SRF_RETURN_NEXT(funcctx, PointerGetDatum(kmer));
 	}
@@ -259,8 +265,8 @@ PG_FUNCTION_INFO_V1(kmer_cmp);
 Datum
 kmer_cmp(PG_FUNCTION_ARGS)
 {
-    KMER *kmer1 = (KMER *) PG_GETARG_POINTER(0);
-    KMER *kmer2 = (KMER *) PG_GETARG_POINTER(1);
+    KMER *kmer1 = (KMER *) PG_GETARG_VARLENA_P(0);
+    KMER *kmer2 = (KMER *) PG_GETARG_VARLENA_P(1);
     
     int len1 = VARSIZE_ANY_EXHDR(kmer1);
     int len2 = VARSIZE_ANY_EXHDR(kmer2);
@@ -280,7 +286,7 @@ PG_FUNCTION_INFO_V1(kmer_hash);
 Datum
 kmer_hash(PG_FUNCTION_ARGS)
 {
-    KMER *kmer = (KMER *) PG_GETARG_POINTER(0);
+    KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(0);
     int len = VARSIZE_ANY_EXHDR(kmer);
     Datum result;
     
