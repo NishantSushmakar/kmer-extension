@@ -26,8 +26,8 @@
 PG_FUNCTION_INFO_V1(kmer_containing);
 Datum kmer_containing(PG_FUNCTION_ARGS)
 {
-	KMER *kmer = (KMER *)PG_GETARG_POINTER(0);
-	QKMER *qkmer = (QKMER *)PG_GETARG_POINTER(1);
+	KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(0);
+	QKMER *qkmer = (QKMER *)PG_GETARG_VARLENA_P(1);
 
 	int len1 = VARSIZE_ANY_EXHDR(qkmer);
 	int len2 = VARSIZE_ANY_EXHDR(kmer);
@@ -55,8 +55,8 @@ Datum kmer_containing(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(kmer_contains);
 Datum kmer_contains(PG_FUNCTION_ARGS)
 {
-	QKMER *qkmer = (QKMER *)PG_GETARG_POINTER(0);
-	KMER *kmer = (KMER *)PG_GETARG_POINTER(1);
+	QKMER *qkmer = (QKMER *)PG_GETARG_VARLENA_P(0);
+	KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(1);
 
 	int len1 = VARSIZE_ANY_EXHDR(qkmer);
 	int len2 = VARSIZE_ANY_EXHDR(kmer);
@@ -84,8 +84,8 @@ Datum kmer_contains(PG_FUNCTION_ARGS)
 PG_FUNCTION_INFO_V1(kmer_starts_with);
 Datum kmer_starts_with(PG_FUNCTION_ARGS)
 {
-	KMER *prefix = (KMER *)PG_GETARG_POINTER(0);
-	KMER *kmer = (KMER *)PG_GETARG_POINTER(1);
+	KMER *prefix = (KMER *)PG_GETARG_VARLENA_P(0);
+	KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(1);
 
 	int len1 = VARSIZE_ANY_EXHDR(prefix);
 	int len2 = VARSIZE_ANY_EXHDR(kmer);
@@ -369,13 +369,13 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 	}
 
 	/* Allocate and construct the new reconstructed k-mer */
-	reconstrKmer = (KMER *)palloc(VARHDRSZ + maxReconstrLen);
-	SET_VARSIZE(reconstrKmer, VARHDRSZ + maxReconstrLen);
+	reconstrKmer = (KMER *)palloc(VARHDRSZ_SHORT + maxReconstrLen);
+	SET_VARSIZE_SHORT(reconstrKmer, VARHDRSZ_SHORT + maxReconstrLen);
 
 	if (in->level)
-		memcpy(VARDATA(reconstrKmer), VARDATA(reconstructedValue), in->level);
+		memcpy(VARDATA_ANY(reconstrKmer), VARDATA_ANY(reconstructedValue), in->level);
 	if (prefixSize)
-		memcpy(((char *)VARDATA(reconstrKmer)) + in->level, VARDATA_ANY(prefixKmer), prefixSize);
+		memcpy(((char *)VARDATA_ANY(reconstrKmer)) + in->level, VARDATA_ANY(prefixKmer), prefixSize);
 
 	/* Initialize output arrays */
 	out->nodeNumbers = (int *)palloc(sizeof(int) * in->nNodes);
@@ -395,7 +395,7 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 			thisLen = maxReconstrLen - 1;
 		else
 		{
-			((unsigned char *)VARDATA(reconstrKmer))[maxReconstrLen - 1] = nodeChar;
+			((unsigned char *)VARDATA_ANY(reconstrKmer))[maxReconstrLen - 1] = nodeChar;
 			thisLen = maxReconstrLen;
 		}
 
@@ -414,7 +414,7 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 			case BTEqualStrategyNumber:
 				inKmer = (KMER *)DatumGetPointer(arg);
 				inSize = VARSIZE_ANY_EXHDR(inKmer);
-				r = memcmp(VARDATA(reconstrKmer), VARDATA_ANY(inKmer), Min(inSize, thisLen));
+				r = memcmp(VARDATA_ANY(reconstrKmer), VARDATA_ANY(inKmer), Min(inSize, thisLen));
 				if (r != 0 || inSize < thisLen)
 					res = false;
 				break;
@@ -443,7 +443,7 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 			case RTPrefixStrategyNumber:
 				inKmer = (KMER *)DatumGetPointer(arg);
 				inSize = VARSIZE_ANY_EXHDR(inKmer);
-				r = memcmp(VARDATA(reconstrKmer), VARDATA_ANY(inKmer), Min(inSize, thisLen));
+				r = memcmp(VARDATA_ANY(reconstrKmer), VARDATA_ANY(inKmer), Min(inSize, thisLen));
 				if (r != 0)
 					res = false;
 				break;
@@ -463,7 +463,7 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 			out->levelAdds[out->nNodes] = thisLen - in->level;
 
 			/* Store reconstructed k-mer as a Datum */
-			SET_VARSIZE(reconstrKmer, VARHDRSZ + thisLen);
+			SET_VARSIZE_SHORT(reconstrKmer, VARHDRSZ_SHORT + thisLen);
 			out->reconstructedValues[out->nNodes] = datumCopy(PointerGetDatum(reconstrKmer), false, -1);
 			out->nNodes++;
 		}
@@ -501,19 +501,19 @@ Datum kmer_leaf_consistent(PG_FUNCTION_ARGS)
 	fullLen = level + VARSIZE_ANY_EXHDR(leafValue);
 	if (VARSIZE_ANY_EXHDR(leafValue) == 0 && level > 0)
 	{
-		fullValue = VARDATA(reconstrValue);
+		fullValue = VARDATA_ANY(reconstrValue);
 		out->leafValue = PointerGetDatum(reconstrValue);
 	}
 	else
 	{
 		/* Allocate and build the full k-mer sequence */
-		KMER *fullKmer = palloc(VARHDRSZ + fullLen);
-		SET_VARSIZE(fullKmer, VARHDRSZ + fullLen);
-		fullValue = VARDATA(fullKmer);
+		KMER *fullKmer = palloc(VARHDRSZ_SHORT + fullLen);
+		SET_VARSIZE_SHORT(fullKmer, VARHDRSZ_SHORT + fullLen);
+		fullValue = VARDATA_ANY(fullKmer);
 
 		/* Copy previous reconstruction and leafValue sequences */
 		if (level)
-			memcpy(fullValue, VARDATA(reconstrValue), level);
+			memcpy(fullValue, VARDATA_ANY(reconstrValue), level);
 		if (VARSIZE_ANY_EXHDR(leafValue) > 0)
 			memcpy(fullValue + level, VARDATA_ANY(leafValue), VARSIZE_ANY_EXHDR(leafValue));
 

@@ -16,12 +16,12 @@ typedef struct spgNodePtr
 
 #define SPGIST_MAX_PREFIX_LENGTH Max((int)(BLCKSZ - 258 * 16 - 100), 32)
 
-// Define value for VARATT_SHORT_MAX if not already definided
+// Define value for VARATT_SHORT_MAX if not already defined
 #ifndef VARATT_SHORT_MAX
 #define VARATT_SHORT_MAX 127
 #endif
 
-// Define value for VARHDRSZ_SHORT if not already definided
+// Define value for VARHDRSZ_SHORT if not already defined
 #ifndef VARHDRSZ_SHORT
 #define VARHDRSZ_SHORT 1
 #endif
@@ -32,22 +32,14 @@ static inline Datum
 formKmerDatum(const char *data, int datalen)
 {
     char *kmer;
+
+    // Ensure that the data length fits within a short header
     Assert(datalen + VARHDRSZ_SHORT <= VARATT_SHORT_MAX);
 
-    kmer = (char *)palloc(datalen + VARHDRSZ);
-
-    // Check if the kmer structure uses the short or regular headers
-    if (datalen + VARHDRSZ_SHORT <= VARATT_SHORT_MAX)
-    {
-        SET_VARSIZE_SHORT(kmer, datalen + VARHDRSZ_SHORT);
-        if (datalen)
-            memcpy(kmer + VARHDRSZ_SHORT, data, datalen);
-    }
-    else
-    {
-        SET_VARSIZE(kmer, datalen + VARHDRSZ);
-        memcpy(kmer + VARHDRSZ, data, datalen);
-    }
+    kmer = (char *)palloc(datalen + VARHDRSZ_SHORT);
+    SET_VARSIZE_SHORT(kmer, datalen + VARHDRSZ_SHORT);
+    if (datalen)
+        memcpy(VARDATA_ANY(kmer), data, datalen);
 
     // Return the KMER structure as a Datum
     return PointerGetDatum(kmer);

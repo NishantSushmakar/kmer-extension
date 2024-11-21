@@ -15,7 +15,8 @@ CREATE OR REPLACE FUNCTION dna_out(dna)
 CREATE TYPE dna (
     INPUT = dna_in,
     OUTPUT = dna_out,
-    INTERNALLENGTH = VARIABLE
+    INTERNALLENGTH = VARIABLE,
+    STORAGE = extended
 );
 
 -- In and out functions - Kmer Type
@@ -32,7 +33,8 @@ CREATE OR REPLACE FUNCTION kmer_out(kmer)
 CREATE TYPE kmer (
     INPUT = kmer_in,
     OUTPUT = kmer_out,
-    INTERNALLENGTH = VARIABLE
+    INTERNALLENGTH = VARIABLE,
+    STORAGE = main
 );
 
 -- In and out functions - Qkmer Type
@@ -49,7 +51,8 @@ CREATE OR REPLACE FUNCTION qkmer_out(qkmer)
 CREATE TYPE qkmer (
     INPUT = qkmer_in,
     OUTPUT = qkmer_out,
-    INTERNALLENGTH = VARIABLE
+    INTERNALLENGTH = VARIABLE,
+    STORAGE = main
 );
 
 -- Length functions
