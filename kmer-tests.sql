@@ -1,59 +1,142 @@
--- ################################## INSERTION, DELETION, SEARCH & INDEXING #######################################
-
-CREATE TABLE dna_kmer_test (
-    dna dna,
-    kmer kmer,
-    qkmer qkmer
-);
-
-COPY dna_kmer_test(dna, kmer, qkmer)
-FROM '/path/to/your/sequences.csv'
-DELIMITER ','
-CSV HEADER;
-
--- DELETION
-    DELETE FROM dna_kmer_test WHERE kmer_sequence = 'CGTACGTA'::kmer;
-
--- SEARCH without index
-    SELECT * FROM dna_kmer_test WHERE kmer_sequence = 'AGCTAGCT'::kmer;
-
--- INDEX
-    CREATE INDEX kmer_index ON dna_kmer_test USING spgist (kmer_sequence);
-
--- SEARCH with index
-    SET enable_seqscan = off;
-    SELECT * FROM dna_kmer_test WHERE kmer_sequence = 'AGCTAGCT'::kmer;
-    SELECT * FROM dna_kmer_test WHERE kmer_sequence ^@ 'ACG';
-    SELECT * FROM dna_kmer_test WHERE 'ANGTA'::qkmer @> kmer_sequence;
-    SELECT * FROM dna_kmer_test WHERE 'ACGNN'::qkmer @> kmer_sequence;
-
-
--- ########################################################################
-
-
-
-
 -- ############################# Data Types #############################
 
--- DNA 
--- Valid values
-    SELECT 'AAAACCCCGGGGTTTT'::dna, 'ACGTTGCA'::dna;           
--- Invalid values
-    SELECT 'ACGTN'::dna; -- Contains invalid character 'N'
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
 
--- KMER 
--- Valid values
-    SELECT 'AAAACCCCGGGGTTTTAAAACCCCGGGGTTTT'::kmer, 'GATTACA'::kmer;                      
--- Invalid values
-    SELECT 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTTT'::kmer, 'AGTCN'::kmer; -- Exceeds 32 nucleotides, Contains invalid character 'N'
+    -- TEST 1: DNA 
 
--- QKMER
--- Valid values
-    SELECT 'ACGT'::qkmer, 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTT'::qkmer;
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
 
--- Invalid values
-    SELECT 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTTT'::qkmer; -- Exceeds 32 nucleotides
-    SELECT 'ACGT123'::qkmer;                           -- Contains numbers
+    -- TEST 1.1 DEfining valid values
+        SELECT 'AAAACCCCGGGGTTTT'::dna, 'ACGTTGCA'::dna;  
+    
+    -- Result:
+        --       dna        |   dna    
+        -- ------------------+----------
+        -- aaaaccccggggtttt | acgttgca
+
+    -- Execution Plan:
+
+    --                                     QUERY PLAN                                      
+    -- -------------------------------------------------------------------------------------
+    -- Result  (cost=0.00..0.01 rows=1 width=64) (actual time=0.007..0.008 rows=1 loops=1)
+    -- Planning Time: 0.019 ms
+    -- Execution Time: 0.445 ms
+    -- (3 rows)
+
+-------------------------------------------------------------------------------------
+
+    -- TEST 1.2 Defining invalid values
+
+        SELECT 'ACGTN'::dna; -- Contains invalid character 'N'
+    
+    -- Result:
+
+        -- ERROR:  Invalid DNA Sequence
+        -- LINE 1: SELECT 'ACGTN'::dna;
+        --                ^
+        -- DETAIL:  Valid characters are A, C, G, T (case-insensitive).
+
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+
+    -- TEST 2: KMER 
+
+-------------------------------------------------------------------------------------    
+-------------------------------------------------------------------------------------
+
+    -- TEST 2.1 Defining valid values
+        SELECT 'AAAACCCCGGGGTTTTAAAACCCCGGGGTTTT'::kmer, 'GATTACA'::kmer;                      
+    
+    -- Result:
+        --                kmer               |  kmer   
+        -- ----------------------------------+---------
+        --  aaaaccccggggttttaaaaccccggggtttt | gattaca
+        -- (1 row)
+    
+    -- Execution Plan
+        --                                      QUERY PLAN                                      
+        -- -------------------------------------------------------------------------------------
+        --  Result  (cost=0.00..0.01 rows=1 width=64) (actual time=0.003..0.004 rows=1 loops=1)
+        --  Planning Time: 0.030 ms
+        --  Execution Time: 0.022 ms
+        -- (3 rows)
+
+-------------------------------------------------------------------------------------
+
+    -- TEST 2.2 Defining invalid values
+        
+        SELECT 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTTT'::kmer; -- Exceeds 32 nucleotides
+    
+    -- Result
+
+        -- ERROR:  KMer Sequence larger than length 32
+        -- LINE 1: SELECT 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTTT'::kmer
+
+
+-------------------------------------------------------------------------------------
+
+    -- TEST 2.3 Defining invalid values
+
+        SELECT 'AGTCN'::kmer; -- Contains invalid character 'N'
+    
+    -- Result
+
+        -- ERROR:  Invalid DNA Sequence
+        -- LINE 1: SELECT 'AGTCN'::kmer;
+        --                ^
+        -- DETAIL:  Valid characters are A, C, G, T (case-insensitive).
+
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+
+    -- TEST 3: QKMER
+
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+
+    -- TEST 3.1: Defining valid values
+    
+        SELECT 'ACGT'::qkmer, 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTT'::qkmer;
+    
+    -- Result
+        --  qkmer |              qkmer               
+        -- -------+----------------------------------
+        --  acgt  | aaaaaaaaccccccccggggggggtttttttt
+        -- (1 row)
+
+    -- Execution Plan
+
+        --                                      QUERY PLAN                                      
+        -- -------------------------------------------------------------------------------------
+        --  Result  (cost=0.00..0.01 rows=1 width=64) (actual time=0.003..0.003 rows=1 loops=1)
+        --  Planning Time: 0.033 ms
+        --  Execution Time: 0.016 ms
+        -- (3 rows)
+
+-------------------------------------------------------------------------------------
+
+    -- TEST 3.2 Defining invalid values
+        
+        SELECT 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTTT'::qkmer; -- Exceeds 32 nucleotides
+    
+    -- Result 
+        --ERROR:  QKMer Sequence larger than length 32
+        --LINE 1: SELECT 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTTT'::qkmer;
+        --               ^
+
+-------------------------------------------------------------------------------------
+
+    -- TEST 3.2 Defining invalid values
+    
+        SELECT 'ACGT123'::qkmer; -- Contains numbers
+    
+    -- Result
+        -- ERROR:  Invalid QKMer Sequence
+        -- LINE 1: SELECT 'ACGT123'::qkmer;
+        --         ^
+
 
 -- ######################################################################
 
@@ -236,6 +319,7 @@ CSV HEADER;
 -- ########################################################################
 
 
+
 -- ############################### Count ###############################
 
 -- COUNT 
@@ -244,6 +328,8 @@ CSV HEADER;
     FROM generate_kmers('ACGTACGT'::dna, 4) AS k(kmer); 
 
 -- ########################################################################
+
+
 
 -- ############################### GROUP BY ###############################
 
@@ -254,4 +340,38 @@ CSV HEADER;
     FROM generate_kmers('ACGTACGT'::dna, 4) AS k(kmer) 
     GROUP BY 1;
     
+-- ########################################################################
+
+
+
+-- ################################## INSERTION, DELETION, SEARCH & INDEXING #######################################
+
+CREATE TABLE dna_kmer_test (
+    dna dna,
+    kmer kmer,
+    qkmer qkmer
+);
+
+COPY dna_kmer_test(dna, kmer, qkmer)
+FROM '/path/to/your/sequences.csv'
+DELIMITER ','
+CSV HEADER;
+
+-- DELETION
+    DELETE FROM dna_kmer_test WHERE kmer_sequence = 'CGTACGTA'::kmer;
+
+-- SEARCH without index
+    SELECT * FROM dna_kmer_test WHERE kmer_sequence = 'AGCTAGCT'::kmer;
+
+-- INDEX
+    CREATE INDEX kmer_index ON dna_kmer_test USING spgist (kmer_sequence);
+
+-- SEARCH with index
+    SET enable_seqscan = off;
+    SELECT * FROM dna_kmer_test WHERE kmer_sequence = 'AGCTAGCT'::kmer;
+    SELECT * FROM dna_kmer_test WHERE kmer_sequence ^@ 'ACG';
+    SELECT * FROM dna_kmer_test WHERE 'ANGTA'::qkmer @> kmer_sequence;
+    SELECT * FROM dna_kmer_test WHERE 'ACGNN'::qkmer @> kmer_sequence;
+
+
 -- ########################################################################
