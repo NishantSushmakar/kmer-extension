@@ -10,8 +10,7 @@ def generate_dataset(n, chars, max_length=32, max_duplicates=20):
     unique_values = []
     final_values = []
 
-    seq_length = random.randint(1, 50)
-    for _ in range(n // 2):  # Start with half unique values
+    for _ in range(n // 2): 
         unique_values.append(generate_sequence(chars, max_length))
 
     for value in unique_values:

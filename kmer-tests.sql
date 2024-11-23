@@ -37,24 +37,19 @@ CSV HEADER;
 
 -- DNA 
 -- Valid values
-    SELECT 'AAAACCCCGGGGTTTT'::dna;   
-    SELECT 'ACGTTGCA'::dna;           
+    SELECT 'AAAACCCCGGGGTTTT'::dna, 'ACGTTGCA'::dna;           
 -- Invalid values
     SELECT 'ACGTN'::dna; -- Contains invalid character 'N'
 
 -- KMER 
 -- Valid values
-    SELECT 'AAAACCCCGGGGTTTTAAAACCCCGGGGTTTT'::kmer; -- Exactly 32 nucleotides
-    SELECT 'GATTACA'::kmer;                      
+    SELECT 'AAAACCCCGGGGTTTTAAAACCCCGGGGTTTT'::kmer, 'GATTACA'::kmer;                      
 -- Invalid values
-    SELECT 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTTT'::kmer; -- Exceeds 32 nucleotides
-    SELECT 'AGTCN'::kmer; -- Contains invalid character 'N'
+    SELECT 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTTT'::kmer, 'AGTCN'::kmer; -- Exceeds 32 nucleotides, Contains invalid character 'N'
 
 -- QKMER
 -- Valid values
-    SELECT 'ACGT'::qkmer;                        
-    SELECT 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTT'::qkmer; -- Exactly 32 nucleotides
-    SELECT 'ACGTNS'::qkmer; -- Contains 'N' and 'S', valid in qkmer
+    SELECT 'ACGT'::qkmer, 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTT'::qkmer;
 
 -- Invalid values
     SELECT 'AAAAAAAACCCCCCCCGGGGGGGGTTTTTTTTT'::qkmer; -- Exceeds 32 nucleotides
@@ -96,15 +91,6 @@ CSV HEADER;
 -- length equal than k: Return the same sequence
     SELECT * FROM generate_kmers('ACGTACGT'::dna, 8); 
 
--- Cartesian Product: Compute the cartesian product between two generated kmers
--- It should return 25 rows 
-    SELECT 
-            a.kmer, 
-            b.kmer 
-    FROM 
-        generate_kmers('ACGTACGT'::dna, 4) AS a(kmer), 
-        generate_kmers('GTACGTAC'::dna, 4) AS b(kmer); 
-
 
 -- ################################ = Operator ################################
 
@@ -124,33 +110,7 @@ CSV HEADER;
     -- Return False
     SELECT 'A'::kmer = ''::kmer;
 
--- Inner Join: Compute the inner join fo two different generated kmers
--- It should return 6 rows: ACGT, CGTA, GTAC, TACG, ACGT, GTAC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    INNER JOIN generate_kmers('GTACGTAC'::dna, 4) AS b(kmer) ON a.kmer = b.kmer; 
-
--- Left Join
--- It should return 5 rows, 2 non null for ACGT and 3 null for the CGTA, GTAC, TAGC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    LEFT JOIN generate_kmers('AGACGTTG'::dna, 4) AS b(kmer) ON a.kmer = b.kmer; 
-
--- Right Join
--- It should return 6 rows, 2 non null for ACGT and 3 null for the AGAC, GACG, CGTT, GTTG
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    RIGHT JOIN generate_kmers('AGACGTTG'::dna, 4) AS b(kmer) ON a.kmer = b.kmer; 
-
--- Implicit join
--- It should return 6 rows: ACGT, CGTA, GTAC, TACG, TACGT, GTAC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer),  
-        generate_kmers('GTACGTAC'::dna, 4) AS b(kmer) 
-    WHERE a.kmer = b.kmer; 
-
 -- ########################################################################
-
 
 
 
@@ -171,33 +131,8 @@ CSV HEADER;
     -- Return False
     SELECT equals('A'::kmer, ''::kmer);
 
--- Inner Join: Compute the inner join fo two different generated kmers
--- It should return 6 rows: ACGT, CGTA, GTAC, TACG, ACGT, GTAC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    INNER JOIN generate_kmers('GTACGTAC'::dna, 4) AS b(kmer) ON equals(a.kmer, b.kmer); 
-
--- Left Join
--- It should return 5 rows, 2 non null for ACGT and 3 null for the CGTA, GTAC, TAGC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    LEFT JOIN generate_kmers('AGACGTTG'::dna, 4) AS b(kmer) ON equals(a.kmer, b.kmer); 
-
--- Right Join
--- It should return 6 rows, 2 non null for ACGT and 4 null for the AGAC, GACG, CGTT, GTTG
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    RIGHT JOIN generate_kmers('AGACGTTG'::dna, 4) AS b(kmer) ON equals(a.kmer, b.kmer); 
-
--- Implicit join
--- It should return 6 rows: ACGT, CGTA, GTAC, TACG, TACGT, GTAC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer),  
-        generate_kmers('GTACGTAC'::dna, 4) AS b(kmer) 
-    WHERE equals(a.kmer, b.kmer); 
 
 -- ########################################################################
-
 
 
 
@@ -220,33 +155,7 @@ CSV HEADER;
     SELECT starts_with('RCGT'::qkmer, 'ACGT'::dna); -- Error: Data type mismatch
     SELECT starts_with('ACGT'::qkmer, 'ACGT'::dna); -- Error: Data type mismatch
 
--- Inner Join: Compute the inner join fo two different generated kmers
--- It should return 6 rows: ACGT, CGTA, GTAC, TACG, TACGT, GTAC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    INNER JOIN generate_kmers('GTACGTAC'::dna, 4) AS b(kmer) ON starts_with(a.kmer, b.kmer); 
-
--- Left Join
--- It should return 5 rows, 2 non null for ACGT and 3 null for the CGTA, GTAC, TAGC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    LEFT JOIN generate_kmers('AGACGTTG'::dna, 4) AS b(kmer) ON starts_with(a.kmer, b.kmer); 
-
--- Right Join
--- It should return 6 rows, 2 non null for ACGT and 3 null for the AGAC, GACG, CGTT, GTTG
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    RIGHT JOIN generate_kmers('AGACGTTG'::dna, 4) AS b(kmer) ON starts_with(a.kmer, b.kmer); 
-
--- Implicit join
--- It should return 6 rows: ACGT, CGTA, GTAC, TACG, TACGT, GTAC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer),  
-        generate_kmers('GTACGTAC'::dna, 4) AS b(kmer) 
-    WHERE starts_with(a.kmer, b.kmer); 
-
 -- ########################################################################
-
 
 
 
@@ -273,34 +182,7 @@ CSV HEADER;
     SELECT 'RCGT'::qkmer ^@ 'ACGT'::dna; -- Error: Data type mismatch
     SELECT 'ACGT'::qkmer ^@ 'ACGT'::dna; -- Error: Data type mismatch
 
-
--- Inner Join: Compute the inner join for two different generated kmers
--- It should return 6 rows: ACGT, CGTA, GTAC, TACG, TACGT, GTAC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    INNER JOIN generate_kmers('GTACGTAC'::dna, 4) AS b(kmer) ON a.kmer ^@ b.kmer; 
-
--- Left Join
--- It should return 5 rows, 2 non null for ACGT and 3 null for the CGTA, GTAC, TAGC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    LEFT JOIN generate_kmers('AGACGTTG'::dna, 4) AS b(kmer) ON a.kmer ^@ b.kmer; 
-
--- Right Join
--- It should return 6 rows, 2 non null for ACGT and 3 null for the AGAC, GACG, CGTT, GTTG
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer)
-    RIGHT JOIN generate_kmers('AGACGTTG'::dna, 4) AS b(kmer) ON a.kmer ^@ b.kmer; 
-
--- Implicit join
--- It should return 6 rows: ACGT, CGTA, GTAC, TACG, TACGT, GTAC
-    SELECT a.kmer, b.kmer 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS a(kmer),  
-        generate_kmers('GTACGTAC'::dna, 4) AS b(kmer) 
-    WHERE a.kmer ^@ b.kmer; 
-
 -- ########################################################################
-
 
 
 
@@ -324,47 +206,7 @@ CSV HEADER;
     SELECT contains('RCGT'::qkmer, 'ACGT'::dna); -- Error: Data type mismatch
     SELECT contains('ACGT'::qkmer, 'ACGT'::dna); -- Error: Data type mismatch
 
--- Joins
-    WITH qkmer_values AS (
-        SELECT * FROM (VALUES 
-            ('ANGTA'::qkmer),  --  5-mer starting with A, followed by any other nucleotide and then G, T and A
-            ('CYGTT'::qkmer),  --  5-mer starting with C, followed by C or T and then G, T and T
-            ('TGNNN'::qkmer),  --  5-mer starting with T, G, and then any 3 of all posible nucleotides
-            ('ACGTA'::qkmer)   
-        ) AS q(qkmer)
-    ),
-    kmer_values AS (
-        SELECT * FROM (VALUES 
-            ('AGGTA'::kmer),  -- Matches ANGTA
-            ('CCGTT'::kmer),  -- Matches CYGTT
-            ('TGGCA'::kmer),  -- Matches TGNNN
-            ('ACGTA'::kmer),  -- Matches  ACGTA
-            ('TTTAA'::kmer)   -- Does not match any value
-        ) AS k(kmer)
-    )
-
-    -- Inner Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA)
-    SELECT q.qkmer, k.kmer
-    FROM qkmer_values q
-    INNER JOIN kmer_values k ON contains(q.qkmer, k.kmer);
-
-    -- Implicit Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA)
-    SELECT q.qkmer, k.kmer
-    FROM qkmer_values q, kmer_values k
-    WHERE contains(q.qkmer, k.kmer);
-
-    -- Left Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA)
-    SELECT q.qkmer, k.kmer
-    FROM qkmer_values q
-    LEFT JOIN kmer_values k ON contains(q.qkmer, k.kmer);
-
-    -- Right Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA), (NULL, TTTAA)
-    SELECT q.qkmer, k.kmer
-    FROM qkmer_values q
-    RIGHT JOIN kmer_values k ON contains(q.qkmer, k.kmer);
-
 -- ########################################################################
-
 
 
 
@@ -391,57 +233,19 @@ CSV HEADER;
     SELECT 'RCGT'::qkmer @> 'ACGT'::kmer; -- Error: Data type mismatch
     SELECT 'ACGT'::qkmer @> 'ACGT'::kmer; -- Error: Data type mismatch
 
-
--- Joins
-    WITH qkmer_values AS (
-        SELECT * FROM (VALUES 
-            ('ANGTA'::qkmer),  --  5-mer starting with A, followed by any other nucleotide and then G, T and A
-            ('CYGTT'::qkmer),  --  5-mer starting with C, followed by C or T and then G, T and T
-            ('TGNNN'::qkmer),  --  5-mer starting with T, G, and then any 3 of all posible nucleotides
-            ('ACGTA'::qkmer)   
-        ) AS q(qkmer)
-    ),
-    kmer_values AS (
-        SELECT * FROM (VALUES 
-            ('AGGTA'::kmer),  -- Matches ANGTA
-            ('CCGTT'::kmer),  -- Matches CYGTT
-            ('TGGCA'::kmer),  -- Matches TGNNN
-            ('ACGTA'::kmer),  -- Matches  ACGTA
-            ('TTTAA'::kmer)   -- Does not match any value
-        ) AS k(kmer)
-    )
-
-    -- Inner Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA)
-    SELECT q.qkmer, k.kmer
-    FROM qkmer_values q
-    INNER JOIN kmer_values k ON q.qkmer @> k.kmer;
-
-    -- Implicit Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA)
-    SELECT q.qkmer, k.kmer
-    FROM qkmer_values q, kmer_values k
-    WHERE q.qkmer @> k.kmer;
-
-    -- Left Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA)
-    SELECT q.qkmer, k.kmer
-    FROM qkmer_values q
-    LEFT JOIN kmer_values k ON q.qkmer @> k.kmer;
-
-    -- Right Join: It should return the tuples (ANGTA, AGGTA), (CYGTT, CCGTT), (TGNNN, TGGCA), (ACGTA, ACGTA), (NULL, TTTAA)
-    SELECT q.qkmer, k.kmer
-    FROM qkmer_values q
-    RIGHT JOIN kmer_values k ON q.qkmer @> k.kmer;
-
 -- ########################################################################
 
 
-
-
--- ############################### GROUP BY ###############################
+-- ############################### Count ###############################
 
 -- COUNT 
 -- Return 5
     SELECT COUNT(k.kmer) 
     FROM generate_kmers('ACGTACGT'::dna, 4) AS k(kmer); 
+
+-- ########################################################################
+
+-- ############################### GROUP BY ###############################
 
 -- GROUP BY Using column name and number in the clause
 -- Return 5 rows with 1 in each count, but for ACGT, which should be 2
@@ -449,113 +253,5 @@ CSV HEADER;
     SELECT k.kmer, COUNT(*) as kmer_count 
     FROM generate_kmers('ACGTACGT'::dna, 4) AS k(kmer) 
     GROUP BY 1;
-
-    SELECT k.kmer, COUNT(*) as kmer_count 
-    FROM generate_kmers('ACGTACGT'::dna, 4) AS k(kmer) 
-    GROUP BY k.kmer;
-
+    
 -- ########################################################################
-
-
-INSERT INTO dna_kmer_test (dna_sequence, kmer_sequence, qkmer_sequence) 
-VALUES
-('ACGTACGT', 'ACGTA', 'TACGT'),
-('TGGCACGT', 'ACGTA', 'TAGT'),
-('ACGTCT', 'AGTA', 'ANGTA'),
-('CGGATACGT', 'ACGTA', 'CGTA'),
-('GCTAGCGA', 'GCTA', 'TACG'),
-('ATCGTACG', 'ACGT', 'GTAC'),
-('AGTCAGTC', 'GCTA', 'AGCGT'),
-('TACGATCG', 'TAGC', 'CAGT'),
-('GCTAGCCT', 'CTAG', 'TAGT'),
-('TGCATGCG', 'GATC', 'GCTA'),
-('ATCGACGT', 'ACGT', 'TACG'),
-('TCAGTCAG', 'AGTC', 'ATGT'),
-('CGTACGTA', 'ACTG', 'CGAT'),
-('GATCGTCA', 'GACG', 'TAGC'),
-('TACGATCG', 'ACTG', 'GCTA'),
-('AGTCGTAC', 'GTAC', 'TACG'),
-('ATCGGCTA', 'CTAG', 'GCTA'),
-('TGCGATCG', 'ACGT', 'TGCT'),
-('CAGTACGT', 'AGTC', 'ACGT'),
-('CTAGGCTA', 'AGTC', 'TACG'),
-('TACGCGTA', 'GACT', 'GTAC'),
-('GTACGCGT', 'AGTC', 'CTAG'),
-('CGAATCGT', 'ACTG', 'GCTA'),
-('AGTCACGT', 'ACGT', 'AGTG'),
-('CGTAGGCT', 'GATC', 'TAGC'),
-('TACGTCAG', 'AGCT', 'TGCA'),
-('ATCGACAT', 'GTAC', 'TGCAT'),
-('GCTAGTAC', 'AGTA', 'ACTG'),
-('TCAGCGTA', 'GTAG', 'TACG'),
-('ATCGATCG', 'GCTA', 'AGTC'),
-('GATGACGT', 'TAGC', 'GCTA'),
-('AGTCAGTG', 'ACTG', 'CTAG'),
-('CAGCTGAC', 'AGTC', 'TACG'),
-('TACGGCTA', 'ACTG', 'GTAC'),
-('CGTATGCA', 'GTCG', 'CAGT'),
-('AGTCACAT', 'ACTG', 'CTAG'),
-('TACGATGC', 'TAGC', 'ACGT'),
-('GCGTACAT', 'GTAC', 'TACG'),
-('ATGCGACT', 'ACGT', 'TAGC'),
-('GCTACTAG', 'GATC', 'ATGC'),
-('AGTGCATG', 'ACTG', 'ACGT'),
-('TACGTGCA', 'TAGC', 'GACT'),
-('TCAGCGTA', 'ACTG', 'AGTC'),
-('GATCGCTA', 'GTAC', 'TACG'),
-('AGTCGTAG', 'GCTA', 'TGCA'),
-('TACGGTAC', 'ACTG', 'CGTA'),
-('ATCAGTGC', 'AGTC', 'TACG'),
-('GCTGCGAC', 'ACTG', 'GTAC'),
-('GATCGTAC', 'GACT', 'ACGT'),
-('ACGTAGCA', 'CTAG', 'ATCG'),
-('TCAGGCTA', 'GATC', 'ACTG'),
-('AGTCACGT', 'ATGC', 'CTAG'),
-('CAGTGACG', 'TAGC', 'ACTG'),
-('TACGAGTA', 'ACTG', 'AGTC'),
-('GTACGCTA', 'ACGT', 'TACG'),
-('ATCGCGTA', 'GATC', 'GTAG'),
-('CGTACATG', 'ACTG', 'TGCA'),
-('TACGCTAG', 'CTAG', 'GTCG'),
-('AGTCATGC', 'GATC', 'ACTG'),
-('TACGAGTC', 'CTAG', 'GACT'),
-('ACGTATGC', 'GATC', 'AGTC'),
-('ATCGGTAC', 'GTAC', 'AGCT'),
-('CGTACGTA', 'ACTG', 'TGCG'),
-('AGTGTACG', 'GACG', 'TACG'),
-('CAGTACGT', 'AGTC', 'ATGC'),
-('TACGATCG', 'ACTG', 'GTAC'),
-('GCTAGGCA', 'ACGT', 'AGTC'),
-('GATCGTAC', 'GACT', 'TGAC'),
-('ATGCTGAC', 'ACTG', 'CTAG'),
-('AGTCAGTC', 'ACGT', 'ACTG'),
-('CGTAGTCG', 'GACT', 'TACG'),
-('AGCTGACG', 'GTAC', 'TACG'),
-('TACGGTAC', 'ACGT', 'TAGC'),
-('GTCAGTAC', 'ACTG', 'CGTA'),
-('ACGTAGCT', 'GTAC', 'AGTC'),
-('TACGACTG', 'TAGC', 'GTAC'),
-('GAGTACGT', 'ACTG', 'CTAG'),
-('AGTCAGTG', 'CTAG', 'TACG'),
-('GCTAGTGC', 'AGTC', 'GTAC'),
-('TCAGCGTA', 'ACGT', 'GCTA'),
-('ATCGGTAG', 'GTAC', 'TAGC'),
-('CAGTGATC', 'ACTG', 'AGTC'),
-('GATCGTAC', 'GACT', 'ACGT'),
-('ACGGTGAC', 'ACTG', 'GTAC'),
-('AGTCGACT', 'AGTC', 'ATGC'),
-('GCTAGGAC', 'GATC', 'TACG'),
-('TACGCGAT', 'ACTG', 'GTAC'),
-('GCTAGTAC', 'ACTG', 'GTAC'),
-('ATGTCGTA', 'GACT', 'AGTC'),
-('CGTACGAG', 'GTAC', 'TAGC'),
-('AGTCGAGT', 'ACTG', 'ACGT'),
-('TACGTAGC', 'GACT', 'AGTC'),
-('GTACATCG', 'GATC', 'TACG'),
-('GCTAGACG', 'ACGT', 'TACG'),
-('AGTCATGC', 'ACTG', 'GTAC'),
-('CGTAGGAC', 'TACG', 'GACT'),
-('TACGGTAC', 'AGTC', 'GACT'),
-('GATCAGTC', 'ACTG', 'TACG'),
-('ACGGTACG', 'GTAC', 'GACT'),
-( 'AGTCGTAC', 'ACGT', 'TAGC');
