@@ -1306,28 +1306,26 @@ CSV HEADER;
         --                                             dna                                             | kmer |           qkmer            
         -- --------------------------------------------------------------------------------------------+------+----------------------------
         --  tgcggatggcgcaactgccggagttcgacctgtaccgagatatgtgtgtcagcg                                     | acga | tcamamswrdahba
-        --  agacatacttaaaagtgtcgtatatacgcaggtcgcccccaccttcgcatctacgacaatcacgccccatgcagttaagg           | acga | kcksdcy
-        --  ggagcactgatgtccgctcgagccgatcctgactatcttatttcggcacgccccgcacccagtcgcatcagtgaactatgtgagaga    | acga | yskwrrmtr
-        --  taacgccagggggatcaccggcttccgccacgcagtccgagcgccatggagccagactgtg                              | acga | mkhk
-        --  cgcagcctagagcagtggcaccttg                                                                  | acga | hbsbmcsymtrycgcr
-        --  caaataggggatagtggctgtagttgactgttgaggtatgacctctgtcgctctgcagcaattataattcctatcgcgcatagtagcggg | acga | kdwgcyggabwvybtvwktbccac
-        --  ttatactgtttgatgtagtgcggtttataatgatgtcggcatcaacgggtattgtgaagcgaatgcgtcgattgccgtaccatggtgcct | acga | dwya
-        --  gccgtgggtttcgaaccgagacagcgtgtgatgtatgggcacatcaccattactttac                                 | acga | gksvtgkwyvmbhahymcvkydtahh
-        --  ctggaccgtaaagagtgagcccctaccccggtgaaaatgagtgagccact                                         | acga | mchsmrhrbwgwckvacgwvasmk
         --  cgcactatttaagccgaattgccgaactcgggcaaaacg                                                    | acga | tybcgdy
+        --  ctggaccgtaaagagtgagcccctaccccggtgaaaatgagtgagccact                                         | acga | mchsmrhrbwgwckvacgwvasmk
+        --  gccgtgggtttcgaaccgagacagcgtgtgatgtatgggcacatcaccattactttac                                 | acga | gksvtgkwyvmbhahymcvkydtahh
+        --  ttatactgtttgatgtagtgcggtttataatgatgtcggcatcaacgggtattgtgaagcgaatgcgtcgattgccgtaccatggtgcct | acga | dwya
+        --  caaataggggatagtggctgtagttgactgttgaggtatgacctctgtcgctctgcagcaattataattcctatcgcgcatagtagcggg | acga | kdwgcyggabwvybtvwktbccac
+        --  cgcagcctagagcagtggcaccttg                                                                  | acga | hbsbmcsymtrycgcr
+        --  taacgccagggggatcaccggcttccgccacgcagtccgagcgccatggagccagactgtg                              | acga | mkhk
+        --  ggagcactgatgtccgctcgagccgatcctgactatcttatttcggcacgccccgcacccagtcgcatcagtgaactatgtgagaga    | acga | yskwrrmtr
+        --  agacatacttaaaagtgtcgtatatacgcaggtcgcccccaccttcgcatctacgacaatcacgccccatgcagttaagg           | acga | kcksdcy
         -- (10 rows)
 
+
     -- Execution Plan
-                                                        QUERY PLAN                                                         
-        -- ---------------------------------------------------------------------------------------------------------------------------
-        --  Bitmap Heap Scan on dna_kmer_test  (cost=1523.78..3600.78 rows=50000 width=85) (actual time=0.152..0.165 rows=10 loops=1)
-        --    Recheck Cond: (kmer = 'acga'::kmer)
-        --    Heap Blocks: exact=9
-        --    ->  Bitmap Index Scan on kmer_index  (cost=0.00..1511.28 rows=50000 width=0) (actual time=0.143..0.143 rows=10 loops=1)
-        --          Index Cond: (kmer = 'acga'::kmer)
-        --  Planning Time: 0.139 ms
-        --  Execution Time: 0.223 ms
-        -- (7 rows)
+        --                                                             QUERY PLAN                                                             
+        -- -----------------------------------------------------------------------------------------------------------------------------------
+        --  Index Scan using kmer_index on dna_kmer_test  (cost=0.28..7819.28 rows=50000 width=85) (actual time=0.078..0.183 rows=10 loops=1)
+        --    Index Cond: (kmer = 'acga'::kmer)
+        --  Planning Time: 0.150 ms
+        --  Execution Time: 0.214 ms
+        -- (4 rows)
 
 -------------------------------------------------------------------------------------
 
@@ -1338,25 +1336,21 @@ CSV HEADER;
     -- Result
         --                                                  dna                                                  |               kmer               |              qkmer               
         -- ------------------------------------------------------------------------------------------------------+----------------------------------+----------------------------------
-        --  tatcccttcagatggtaggatacggttacttgattagttcgttgtcctgatggcacaatccatgagagcaaagcc                          | acgattacaatattctc                | sm
-        --  tccgaacccaagtatcggacgtgctcctttaaaataccaaatcctaaggggg                                                 | acgatccctgttgtcgcccgtatc         | vdahcsyk
-        --  agtcaggtataattgtgcatttcggagaagaggtcctcatgtgcgcggcaggattagaccgccac                                    | acgacccacaaat                    | tbygryv
-        --  atatcgagtgtac                                                                                        | acgagaaatgagaattt                | bmdrhhcdvhycksdgab
-        --  tacatcagaatcctaaatatgcagatcacatatacggaatcccgcggtaaatttaactatgggggaggattccagacaagtgaatcatatattagca    | acgatagtagt                      | mtbhmrsdymdhtdkmbhacrbkdssm
-        --  ggtaacataattaaccctatccagcaaatcactctacgagttt                                                          | acgatgactgacga                   | ygbrdttmktghbk
-        --  tcccgtaacgtaagagactgtaacatgcaggtaacccaagtgccccctggtggcgatcctccagtgcggagagcgctacatggatccac            | acgact                           | rdgastysdykvwcsbsgyvdgwg
-        --  atctcaagacagagtactactatgcgtcgcaggtcgccttggagaatccacggaaatgttgtctt                                    | acgacgctcg                       | dgshcwdhagvrsgmksydygatraghs
+        --  tgcggatggcgcaactgccggagttcgacctgtaccgagatatgtgtgtcagcg                                               | acga                             | tcamamswrdahba
+        --  cgcactatttaagccgaattgccgaactcgggcaaaacg                                                              | acga                             | tybcgdy
+        --  ctggaccgtaaagagtgagcccctaccccggtgaaaatgagtgagccact                                                   | acga                             | mchsmrhrbwgwckvacgwvasmk
+        --  gccgtgggtttcgaaccgagacagcgtgtgatgtatgggcacatcaccattactttac                                           | acga                             | gksvtgkwyvmbhahymcvkydtahh
+        --  ttatactgtttgatgtagtgcggtttataatgatgtcggcatcaacgggtattgtgaagcgaatgcgtcgattgccgtaccatggtgcct           | acga                             | dwya
+        --  caaataggggatagtggctgtagttgactgttgaggtatgacctctgtcgctctgcagcaattataattcctatcgcgcatagtagcggg           | acga                             | kdwgcyggabwvybtvwktbccac
 
     -- Execution Plan
-        --                                                          QUERY PLAN                                                         
-        -- ----------------------------------------------------------------------------------------------------------------------------
-        --  Bitmap Heap Scan on dna_kmer_test  (cost=1523.78..3600.78 rows=50000 width=85) (actual time=0.438..0.788 rows=375 loops=1)
-        --    Recheck Cond: (kmer ^@ 'acga'::kmer)
-        --    Heap Blocks: exact=326
-        --    ->  Bitmap Index Scan on kmer_index  (cost=0.00..1511.28 rows=50000 width=0) (actual time=0.371..0.372 rows=375 loops=1)
-        --          Index Cond: (kmer ^@ 'acga'::kmer)
-        --  Planning Time: 0.106 ms
-        --  Execution Time: 0.869 ms
-        -- (7 rows)
+        --                                                              QUERY PLAN                                                             
+        -- ------------------------------------------------------------------------------------------------------------------------------------
+        --  Index Scan using kmer_index on dna_kmer_test  (cost=0.28..7819.28 rows=50000 width=85) (actual time=0.151..0.873 rows=375 loops=1)
+        --    Index Cond: (kmer ^@ 'acga'::kmer)
+        --  Planning Time: 0.133 ms
+        --  Execution Time: 0.968 ms
+        -- (4 rows)
+
 
 -- ########################################################################
