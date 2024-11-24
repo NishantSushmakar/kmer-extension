@@ -202,7 +202,34 @@
         --  Planning Time: 0.047 ms
         --  Execution Time: 0.022 ms
         -- (3 rows)
+-------------------------------------------------------------------------------------
 
+-- TEST 4.4: Performance test of the length function at scale
+
+    SELECT
+        length(dna) length_dna,
+        length(kmer) length_kmer,
+        length(qkmer) length_qkmer
+    FROM dna_kmer_test;
+
+    -- Result
+        --  length_dna | length_kmer | length_qkmer 
+        -- ------------+-------------+--------------
+        --           3 |          13 |            7
+        --          34 |          10 |           17
+        --          30 |          22 |           16
+        --          97 |          11 |           16
+        --          92 |           5 |            6
+        --          48 |          27 |           12
+        --           2 |          32 |           18
+
+    -- Execution Plan
+        --                                                       QUERY PLAN                                                      
+        -- ----------------------------------------------------------------------------------------------------------------------
+        --  Seq Scan on dna_kmer_test  (cost=0.00..3202.00 rows=100000 width=12) (actual time=0.015..27.510 rows=100000 loops=1)
+        --  Planning Time: 0.104 ms
+        --  Execution Time: 33.470 ms
+        -- (3 rows)
 
 -- ########################################################################
 
@@ -359,6 +386,40 @@
         --  Execution Time: 0.011 ms
         -- (3 rows)
 
+-------------------------------------------------------------------------------------
+
+-- TEST 6.5: Performance test of the equals operator at scale
+
+    SELECT
+        *
+    FROM dna_kmer_test
+    WHERE kmer = 'ACGA';
+
+    -- Result
+        --                                             dna                                             | kmer |           qkmer            
+        -- --------------------------------------------------------------------------------------------+------+----------------------------
+        --  tgcggatggcgcaactgccggagttcgacctgtaccgagatatgtgtgtcagcg                                     | acga | tcamamswrdahba
+        --  agacatacttaaaagtgtcgtatatacgcaggtcgcccccaccttcgcatctacgacaatcacgccccatgcagttaagg           | acga | kcksdcy
+        --  ggagcactgatgtccgctcgagccgatcctgactatcttatttcggcacgccccgcacccagtcgcatcagtgaactatgtgagaga    | acga | yskwrrmtr
+        --  taacgccagggggatcaccggcttccgccacgcagtccgagcgccatggagccagactgtg                              | acga | mkhk
+        --  cgcagcctagagcagtggcaccttg                                                                  | acga | hbsbmcsymtrycgcr
+        --  caaataggggatagtggctgtagttgactgttgaggtatgacctctgtcgctctgcagcaattataattcctatcgcgcatagtagcggg | acga | kdwgcyggabwvybtvwktbccac
+        --  ttatactgtttgatgtagtgcggtttataatgatgtcggcatcaacgggtattgtgaagcgaatgcgtcgattgccgtaccatggtgcct | acga | dwya
+        --  gccgtgggtttcgaaccgagacagcgtgtgatgtatgggcacatcaccattactttac                                 | acga | gksvtgkwyvmbhahymcvkydtahh
+        --  ctggaccgtaaagagtgagcccctaccccggtgaaaatgagtgagccact                                         | acga | mchsmrhrbwgwckvacgwvasmk
+        --  cgcactatttaagccgaattgccgaactcgggcaaaacg                                                    | acga | tybcgdy
+        -- (10 rows)
+
+    -- Execution Plan
+        --                                                    QUERY PLAN                                                    
+        -- -----------------------------------------------------------------------------------------------------------------
+        --  Seq Scan on dna_kmer_test  (cost=0.00..2702.00 rows=50000 width=85) (actual time=1.612..22.980 rows=10 loops=1)
+        --    Filter: (kmer = 'acga'::kmer)
+        --    Rows Removed by Filter: 99990
+        --  Planning Time: 0.080 ms
+        --  Execution Time: 23.011 ms
+        -- (5 rows)
+
 -- ########################################################################
 
 
@@ -446,6 +507,41 @@
         --  Planning Time: 0.033 ms
         --  Execution Time: 0.013 ms
         -- (3 rows)
+
+-------------------------------------------------------------------------------------
+
+-- TEST 7.5: Performance test of the equals function at scale
+
+    SELECT
+        *
+    FROM dna_kmer_test
+    WHERE equals(kmer, 'ACGA');
+
+    -- Result
+        --                                             dna                                             | kmer |           qkmer            
+        -- --------------------------------------------------------------------------------------------+------+----------------------------
+        --  tgcggatggcgcaactgccggagttcgacctgtaccgagatatgtgtgtcagcg                                     | acga | tcamamswrdahba
+        --  agacatacttaaaagtgtcgtatatacgcaggtcgcccccaccttcgcatctacgacaatcacgccccatgcagttaagg           | acga | kcksdcy
+        --  ggagcactgatgtccgctcgagccgatcctgactatcttatttcggcacgccccgcacccagtcgcatcagtgaactatgtgagaga    | acga | yskwrrmtr
+        --  taacgccagggggatcaccggcttccgccacgcagtccgagcgccatggagccagactgtg                              | acga | mkhk
+        --  cgcagcctagagcagtggcaccttg                                                                  | acga | hbsbmcsymtrycgcr
+        --  caaataggggatagtggctgtagttgactgttgaggtatgacctctgtcgctctgcagcaattataattcctatcgcgcatagtagcggg | acga | kdwgcyggabwvybtvwktbccac
+        --  ttatactgtttgatgtagtgcggtttataatgatgtcggcatcaacgggtattgtgaagcgaatgcgtcgattgccgtaccatggtgcct | acga | dwya
+        --  gccgtgggtttcgaaccgagacagcgtgtgatgtatgggcacatcaccattactttac                                 | acga | gksvtgkwyvmbhahymcvkydtahh
+        --  ctggaccgtaaagagtgagcccctaccccggtgaaaatgagtgagccact                                         | acga | mchsmrhrbwgwckvacgwvasmk
+        --  cgcactatttaagccgaattgccgaactcgggcaaaacg                                                    | acga | tybcgdy
+        -- (10 rows)
+
+    -- Execution Plan
+        --                                                    QUERY PLAN                                                    
+        -- -----------------------------------------------------------------------------------------------------------------
+        --  Seq Scan on dna_kmer_test  (cost=0.00..2702.00 rows=33333 width=85) (actual time=3.911..25.128 rows=10 loops=1)
+        --    Filter: equals(kmer, 'acga'::kmer)
+        --    Rows Removed by Filter: 99990
+        --  Planning Time: 0.073 ms
+        --  Execution Time: 25.158 ms
+        -- (5 rows)
+
 
 -- ########################################################################
 
@@ -542,6 +638,37 @@
         -- LINE 1: SELECT starts_with('RCGT'::qkmer, 'ACGT'::dna);
         --                ^
         -- HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+
+-------------------------------------------------------------------------------------
+
+-- TEST 8.6: Performance test of the starts_with function at scale
+
+    SELECT
+        *
+    FROM dna_kmer_test
+    WHERE starts_with('ACGA', kmer);
+    
+    -- Result
+        --                                                  dna                                                  |               kmer               |              qkmer               
+        -- ------------------------------------------------------------------------------------------------------+----------------------------------+----------------------------------
+        --  tatcccttcagatggtaggatacggttacttgattagttcgttgtcctgatggcacaatccatgagagcaaagcc                          | acgattacaatattctc                | sm
+        --  tccgaacccaagtatcggacgtgctcctttaaaataccaaatcctaaggggg                                                 | acgatccctgttgtcgcccgtatc         | vdahcsyk
+        --  agtcaggtataattgtgcatttcggagaagaggtcctcatgtgcgcggcaggattagaccgccac                                    | acgacccacaaat                    | tbygryv
+        --  atatcgagtgtac                                                                                        | acgagaaatgagaattt                | bmdrhhcdvhycksdgab
+        --  tacatcagaatcctaaatatgcagatcacatatacggaatcccgcggtaaatttaactatgggggaggattccagacaagtgaatcatatattagca    | acgatagtagt                      | mtbhmrsdymdhtdkmbhacrbkdssm
+        --  ggtaacataattaaccctatccagcaaatcactctacgagttt                                                          | acgatgactgacga                   | ygbrdttmktghbk
+        --  tcccgtaacgtaagagactgtaacatgcaggtaacccaagtgccccctggtggcgatcctccagtgcggagagcgctacatggatccac            | acgact                           | rdgastysdykvwcsbsgyvdgwg
+        --  atctcaagacagagtactactatgcgtcgcaggtcgccttggagaatccacggaaatgttgtctt                                    | acgacgctcg                       | dgshcwdhagvrsgmksydygatraghs
+
+    -- Execution Plan
+        --                                                     QUERY PLAN                                                    
+        -- ------------------------------------------------------------------------------------------------------------------
+        --  Seq Scan on dna_kmer_test  (cost=0.00..2702.00 rows=33333 width=85) (actual time=0.176..24.422 rows=375 loops=1)
+        --    Filter: starts_with('acga'::kmer, kmer)
+        --    Rows Removed by Filter: 99625
+        --  Planning Time: 0.226 ms
+        --  Execution Time: 24.505 ms
+        -- (5 rows)
 
 -- ########################################################################
 
@@ -659,6 +786,37 @@
         --                              ^
         -- HINT:  No operator matches the given name and argument types. You might need to add explicit type casts.
 
+-------------------------------------------------------------------------------------
+
+-- TEST 9.7: Performance test of the starts_with operator at scale
+
+    SELECT
+        *
+    FROM dna_kmer_test
+    WHERE kmer ^@ 'ACGA';
+    
+    -- Result
+        --                                                  dna                                                  |               kmer               |              qkmer               
+        -- ------------------------------------------------------------------------------------------------------+----------------------------------+----------------------------------
+        --  tatcccttcagatggtaggatacggttacttgattagttcgttgtcctgatggcacaatccatgagagcaaagcc                          | acgattacaatattctc                | sm
+        --  tccgaacccaagtatcggacgtgctcctttaaaataccaaatcctaaggggg                                                 | acgatccctgttgtcgcccgtatc         | vdahcsyk
+        --  agtcaggtataattgtgcatttcggagaagaggtcctcatgtgcgcggcaggattagaccgccac                                    | acgacccacaaat                    | tbygryv
+        --  atatcgagtgtac                                                                                        | acgagaaatgagaattt                | bmdrhhcdvhycksdgab
+        --  tacatcagaatcctaaatatgcagatcacatatacggaatcccgcggtaaatttaactatgggggaggattccagacaagtgaatcatatattagca    | acgatagtagt                      | mtbhmrsdymdhtdkmbhacrbkdssm
+        --  ggtaacataattaaccctatccagcaaatcactctacgagttt                                                          | acgatgactgacga                   | ygbrdttmktghbk
+        --  tcccgtaacgtaagagactgtaacatgcaggtaacccaagtgccccctggtggcgatcctccagtgcggagagcgctacatggatccac            | acgact                           | rdgastysdykvwcsbsgyvdgwg
+        --  atctcaagacagagtactactatgcgtcgcaggtcgccttggagaatccacggaaatgttgtctt                                    | acgacgctcg                       | dgshcwdhagvrsgmksydygatraghs
+    
+    -- Execution Plan
+        --                                                     QUERY PLAN                                                    
+        -- ------------------------------------------------------------------------------------------------------------------
+        --  Seq Scan on dna_kmer_test  (cost=0.00..2702.00 rows=50000 width=85) (actual time=0.164..24.703 rows=375 loops=1)
+        --    Filter: (kmer ^@ 'acga'::kmer)
+        --    Rows Removed by Filter: 99625
+        --  Planning Time: 0.069 ms
+        --  Execution Time: 24.780 ms
+        -- (5 rows)
+
 -- ########################################################################
 
 
@@ -753,6 +911,37 @@
     -- LINE 1: SELECT contains('RCGT'::qkmer, 'ACGT'::dna);
     --                ^
     -- HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+
+-------------------------------------------------------------------------------------
+
+-- TEST 10.6: Performance test of the contains function at scale
+
+    SELECT
+        *
+    FROM dna_kmer_test
+    WHERE contains('ANGRY', kmer);
+    
+    -- Result
+        --                                                  dna                                                 | kmer  |              qkmer               
+        -- -----------------------------------------------------------------------------------------------------+-------+----------------------------------
+        --  cggggtagttaactgcatctagagcaacacatcaatttcacttac                                                       | agggt | cggagbgwmcdyhhvrmdgb
+        --  tacta                                                                                               | aagac | mytdhkst
+        --  gtctcaagaaccgccagtgggttcaagcgggactc                                                                 | agggt | rchdvmhdkmrdsa
+        --  ctgtttagggatttcgggtgttagat                                                                          | aagat | abcrgaavyh
+        --  cgatggagtttcctttcttacaaaggactgcc                                                                    | atgat | vmmdgdytkymkdhsg
+        --  tcaactagaaccgaat                                                                                    | aagat | vhmsyyvtra
+        --  agacg                                                                                               | aagat | s
+        --  cgggtccgtcttatctgcgccaattccgtagtgaacagccgataatactagcaggcatatatatggg                                 | aagat | rkkgbybcdwvawcdakryrcgrt
+
+    -- Execution Plan
+        --                                                    QUERY PLAN                                                    
+        -- -----------------------------------------------------------------------------------------------------------------
+        --  Seq Scan on dna_kmer_test  (cost=0.00..2702.00 rows=33333 width=85) (actual time=0.392..23.476 rows=46 loops=1)
+        --    Filter: contains('angry'::qkmer, kmer)
+        --    Rows Removed by Filter: 99954
+        --  Planning Time: 0.052 ms
+        --  Execution Time: 23.509 ms
+        -- (5 rows)
 
 -- ########################################################################
 
@@ -879,13 +1068,45 @@
         --  Execution Time: 0.018 ms
         -- (3 rows)
 
+-------------------------------------------------------------------------------------
+
+-- TEST 11.7: Performance test of the contains operator at scale
+
+    SELECT
+        *
+    FROM dna_kmer_test
+    WHERE 'ANGRY' @> kmer;
+    
+    -- Result
+        --                                                  dna                                                 | kmer  |              qkmer               
+        -- -----------------------------------------------------------------------------------------------------+-------+----------------------------------
+        --  cggggtagttaactgcatctagagcaacacatcaatttcacttac                                                       | agggt | cggagbgwmcdyhhvrmdgb
+        --  tacta                                                                                               | aagac | mytdhkst
+        --  gtctcaagaaccgccagtgggttcaagcgggactc                                                                 | agggt | rchdvmhdkmrdsa
+        --  ctgtttagggatttcgggtgttagat                                                                          | aagat | abcrgaavyh
+        --  cgatggagtttcctttcttacaaaggactgcc                                                                    | atgat | vmmdgdytkymkdhsg
+        --  tcaactagaaccgaat                                                                                    | aagat | vhmsyyvtra
+        --  agacg                                                                                               | aagat | s
+        --  cgggtccgtcttatctgcgccaattccgtagtgaacagccgataatactagcaggcatatatatggg                                 | aagat | rkkgbybcdwvawcdakryrcgrt
+
+    -- Execution Plan
+        --                                                    QUERY PLAN                                                    
+        -- -----------------------------------------------------------------------------------------------------------------
+        --  Seq Scan on dna_kmer_test  (cost=0.00..2702.00 rows=50000 width=85) (actual time=0.548..25.765 rows=46 loops=1)
+        --    Filter: ('angry'::qkmer @> kmer)
+        --    Rows Removed by Filter: 99954
+        --  Planning Time: 0.068 ms
+        --  Execution Time: 25.805 ms
+        -- (5 rows)
+
+
 -- ########################################################################
 
 
 
 -- ############################### Count ###############################
 
--- TEST 12.1: COUNT 
+-- TEST 12.1: Performance function of whether the COUNT function works as expected
 
     SELECT COUNT(k.kmer) 
     FROM generate_kmers('ACGTACGT'::dna, 4) AS k(kmer); -- Return 5
@@ -905,17 +1126,42 @@
     --  Execution Time: 0.092 ms
     -- (4 rows)
 
+-------------------------------------------------------------------------------------
+
+-- TEST 12.2: Performance test of the COUNT function at scale
+
+    SELECT 
+            COUNT(dna) AS dna_count, 
+            COUNT(kmer) AS kmer_count, 
+            COUNT(qkmer) AS qkmer_count
+    FROM dna_kmer_test; 
+    
+    -- Result
+        --  dna_count | kmer_count | qkmer_count 
+        -- -----------+------------+-------------
+        --     100000 |     100000 |      100000
+        -- (1 row)
+
+    -- Execution Plan
+        --                                                          QUERY PLAN                                                         
+        -- ----------------------------------------------------------------------------------------------------------------------------
+        --  Aggregate  (cost=3202.00..3202.01 rows=1 width=24) (actual time=36.054..36.055 rows=1 loops=1)
+        --    ->  Seq Scan on dna_kmer_test  (cost=0.00..2452.00 rows=100000 width=85) (actual time=0.014..13.654 rows=100000 loops=1)
+        --  Planning Time: 0.092 ms
+        --  Execution Time: 36.120 ms
+        -- (4 rows)
+
 -- ########################################################################
 
 
 
 -- ############################### GROUP BY ###############################
 
--- TEST 13.1: GROUP BY Using column name and number in the clause
+-- TEST 13.1: Performance test of whether the GROUP BY clause works as expected
 
     SELECT k.kmer, COUNT(*) as kmer_count 
     FROM generate_kmers('ACGTACGT'::dna, 4) AS k(kmer) 
-    GROUP BY 1; -- Return 5 rows with 1 in each count, but for ACGT, which should be 2
+    GROUP BY k.kmer; -- Return 5 rows with 1 in each count, but for ACGT, which should be 2
     
     -- Result
         --  kmer | kmer_count 
@@ -935,6 +1181,36 @@
         --    ->  Function Scan on generate_kmers k  (cost=0.00..10.00 rows=1000 width=32) (actual time=0.014..0.014 rows=5 loops=1)
         --  Planning Time: 0.102 ms
         --  Execution Time: 0.097 ms
+        -- (6 rows)
+
+-------------------------------------------------------------------------------------
+
+-- TEST 13.2: Performance test of the GROUP BY clause at scale
+
+    SELECT 
+            kmer,
+            COUNT(qkmer) AS qkmer_count
+    FROM dna_kmer_test
+    GROUP BY kmer; 
+    
+    -- Result
+        --                kmer               | qkmer_count 
+        -- ----------------------------------+-------------
+        --  ataactcggcggtacgcatgtaa          |           2
+        --  ccaaattgcacccactaactggattaattga  |           1
+        --  cgtcaaggttcagatcgtgcggcgacactgga |           3
+        --  acggac                           |           7
+        --  tatccatttg                       |           2
+
+    -- Execution Plan
+        --                                                          QUERY PLAN                                                         
+        -- ----------------------------------------------------------------------------------------------------------------------------
+        --  HashAggregate  (cost=11202.00..13531.94 rows=76744 width=25) (actual time=66.931..75.673 rows=34018 loops=1)
+        --    Group Key: kmer
+        --    Planned Partitions: 4  Batches: 5  Memory Usage: 4401kB  Disk Usage: 728kB
+        --    ->  Seq Scan on dna_kmer_test  (cost=0.00..2452.00 rows=100000 width=34) (actual time=0.011..12.291 rows=100000 loops=1)
+        --  Planning Time: 0.064 ms
+        --  Execution Time: 78.657 ms
         -- (6 rows)
 
 -- ########################################################################
