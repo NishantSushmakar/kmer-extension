@@ -1219,32 +1219,144 @@
 
 -- ################################## INSERTION, DELETION, SEARCH & INDEXING #######################################
 
+-- Create Table
 CREATE TABLE dna_kmer_test (
     dna dna,
     kmer kmer,
     qkmer qkmer
 );
 
+-- Populate table with CSV file
 COPY dna_kmer_test(dna, kmer, qkmer)
 FROM '/path/to/your/sequences.csv'
 DELIMITER ','
 CSV HEADER;
 
--- DELETION
-    DELETE FROM dna_kmer_test WHERE kmer_sequence = 'CGTACGTA'::kmer;
+-------------------------------------------------------------------------------------
 
--- SEARCH without index
-    SELECT * FROM dna_kmer_test WHERE kmer_sequence = 'AGCTAGCT'::kmer;
+-- TEST 14.1: Search without index
 
--- INDEX
-    CREATE INDEX kmer_index ON dna_kmer_test USING spgist (kmer_sequence);
+    SELECT * FROM dna_kmer_test WHERE kmer = 'ACGA'::kmer;
+    
+    -- Result
+        --                                             dna                                             | kmer |           qkmer            
+        -- --------------------------------------------------------------------------------------------+------+----------------------------
+        --  tgcggatggcgcaactgccggagttcgacctgtaccgagatatgtgtgtcagcg                                     | acga | tcamamswrdahba
+        --  agacatacttaaaagtgtcgtatatacgcaggtcgcccccaccttcgcatctacgacaatcacgccccatgcagttaagg           | acga | kcksdcy
+        --  ggagcactgatgtccgctcgagccgatcctgactatcttatttcggcacgccccgcacccagtcgcatcagtgaactatgtgagaga    | acga | yskwrrmtr
+        --  taacgccagggggatcaccggcttccgccacgcagtccgagcgccatggagccagactgtg                              | acga | mkhk
+        --  cgcagcctagagcagtggcaccttg                                                                  | acga | hbsbmcsymtrycgcr
+        --  caaataggggatagtggctgtagttgactgttgaggtatgacctctgtcgctctgcagcaattataattcctatcgcgcatagtagcggg | acga | kdwgcyggabwvybtvwktbccac
+        --  ttatactgtttgatgtagtgcggtttataatgatgtcggcatcaacgggtattgtgaagcgaatgcgtcgattgccgtaccatggtgcct | acga | dwya
+        --  gccgtgggtttcgaaccgagacagcgtgtgatgtatgggcacatcaccattactttac                                 | acga | gksvtgkwyvmbhahymcvkydtahh
+        --  ctggaccgtaaagagtgagcccctaccccggtgaaaatgagtgagccact                                         | acga | mchsmrhrbwgwckvacgwvasmk
+        --  cgcactatttaagccgaattgccgaactcgggcaaaacg                                                    | acga | tybcgdy
+        -- (10 rows)
+    
+    -- Execution Plan
+        --                                                    QUERY PLAN                                                    
+        -- -----------------------------------------------------------------------------------------------------------------
+        --  Seq Scan on dna_kmer_test  (cost=0.00..2702.00 rows=50000 width=85) (actual time=2.175..15.259 rows=10 loops=1)
+        --    Filter: (kmer = 'acga'::kmer)
+        --    Rows Removed by Filter: 99990
+        --  Planning Time: 0.053 ms
+        --  Execution Time: 15.284 ms
+        -- (5 rows)
 
--- SEARCH with index
+-------------------------------------------------------------------------------------
+
+-- TEST 14.2: Search without index
+
+    SELECT * FROM dna_kmer_test WHERE kmer ^@ 'ACGA';
+    
+    -- Result
+        --                                                  dna                                                  |               kmer               |              qkmer               
+        -- ------------------------------------------------------------------------------------------------------+----------------------------------+----------------------------------
+        --  tatcccttcagatggtaggatacggttacttgattagttcgttgtcctgatggcacaatccatgagagcaaagcc                          | acgattacaatattctc                | sm
+        --  tccgaacccaagtatcggacgtgctcctttaaaataccaaatcctaaggggg                                                 | acgatccctgttgtcgcccgtatc         | vdahcsyk
+        --  agtcaggtataattgtgcatttcggagaagaggtcctcatgtgcgcggcaggattagaccgccac                                    | acgacccacaaat                    | tbygryv
+        --  atatcgagtgtac                                                                                        | acgagaaatgagaattt                | bmdrhhcdvhycksdgab
+        --  tacatcagaatcctaaatatgcagatcacatatacggaatcccgcggtaaatttaactatgggggaggattccagacaagtgaatcatatattagca    | acgatagtagt                      | mtbhmrsdymdhtdkmbhacrbkdssm
+        --  ggtaacataattaaccctatccagcaaatcactctacgagttt                                                          | acgatgactgacga                   | ygbrdttmktghbk
+        --  tcccgtaacgtaagagactgtaacatgcaggtaacccaagtgccccctggtggcgatcctccagtgcggagagcgctacatggatccac            | acgact                           | rdgastysdykvwcsbsgyvdgwg
+        --  atctcaagacagagtactactatgcgtcgcaggtcgccttggagaatccacggaaatgttgtctt                                    | acgacgctcg                       | dgshcwdhagvrsgmksydygatraghs
+
+    -- Execution Plan
+        --                                                     QUERY PLAN                                                    
+        -- ------------------------------------------------------------------------------------------------------------------
+        --  Seq Scan on dna_kmer_test  (cost=0.00..2702.00 rows=50000 width=85) (actual time=0.116..26.520 rows=375 loops=1)
+        --    Filter: (kmer ^@ 'acga'::kmer)
+        --    Rows Removed by Filter: 99625
+        --  Planning Time: 0.050 ms
+        --  Execution Time: 26.610 ms
+        -- (5 rows)
+
+-------------------------------------------------------------------------------------
+
+    CREATE INDEX kmer_index ON dna_kmer_test USING spgist (kmer);
     SET enable_seqscan = off;
-    SELECT * FROM dna_kmer_test WHERE kmer_sequence = 'AGCTAGCT'::kmer;
-    SELECT * FROM dna_kmer_test WHERE kmer_sequence ^@ 'ACG';
-    SELECT * FROM dna_kmer_test WHERE 'ANGTA'::qkmer @> kmer_sequence;
-    SELECT * FROM dna_kmer_test WHERE 'ACGNN'::qkmer @> kmer_sequence;
 
+-------------------------------------------------------------------------------------
+
+-- TEST 14.3: Search with index
+
+    SELECT * FROM dna_kmer_test WHERE kmer = 'ACGA'::kmer;
+
+    -- Result
+        --                                             dna                                             | kmer |           qkmer            
+        -- --------------------------------------------------------------------------------------------+------+----------------------------
+        --  tgcggatggcgcaactgccggagttcgacctgtaccgagatatgtgtgtcagcg                                     | acga | tcamamswrdahba
+        --  agacatacttaaaagtgtcgtatatacgcaggtcgcccccaccttcgcatctacgacaatcacgccccatgcagttaagg           | acga | kcksdcy
+        --  ggagcactgatgtccgctcgagccgatcctgactatcttatttcggcacgccccgcacccagtcgcatcagtgaactatgtgagaga    | acga | yskwrrmtr
+        --  taacgccagggggatcaccggcttccgccacgcagtccgagcgccatggagccagactgtg                              | acga | mkhk
+        --  cgcagcctagagcagtggcaccttg                                                                  | acga | hbsbmcsymtrycgcr
+        --  caaataggggatagtggctgtagttgactgttgaggtatgacctctgtcgctctgcagcaattataattcctatcgcgcatagtagcggg | acga | kdwgcyggabwvybtvwktbccac
+        --  ttatactgtttgatgtagtgcggtttataatgatgtcggcatcaacgggtattgtgaagcgaatgcgtcgattgccgtaccatggtgcct | acga | dwya
+        --  gccgtgggtttcgaaccgagacagcgtgtgatgtatgggcacatcaccattactttac                                 | acga | gksvtgkwyvmbhahymcvkydtahh
+        --  ctggaccgtaaagagtgagcccctaccccggtgaaaatgagtgagccact                                         | acga | mchsmrhrbwgwckvacgwvasmk
+        --  cgcactatttaagccgaattgccgaactcgggcaaaacg                                                    | acga | tybcgdy
+        -- (10 rows)
+
+    -- Execution Plan
+                                                        QUERY PLAN                                                         
+        -- ---------------------------------------------------------------------------------------------------------------------------
+        --  Bitmap Heap Scan on dna_kmer_test  (cost=1523.78..3600.78 rows=50000 width=85) (actual time=0.152..0.165 rows=10 loops=1)
+        --    Recheck Cond: (kmer = 'acga'::kmer)
+        --    Heap Blocks: exact=9
+        --    ->  Bitmap Index Scan on kmer_index  (cost=0.00..1511.28 rows=50000 width=0) (actual time=0.143..0.143 rows=10 loops=1)
+        --          Index Cond: (kmer = 'acga'::kmer)
+        --  Planning Time: 0.139 ms
+        --  Execution Time: 0.223 ms
+        -- (7 rows)
+
+-------------------------------------------------------------------------------------
+
+-- TEST 14.3: Search with index
+
+    SELECT * FROM dna_kmer_test WHERE kmer ^@ 'ACGA';
+
+    -- Result
+        --                                                  dna                                                  |               kmer               |              qkmer               
+        -- ------------------------------------------------------------------------------------------------------+----------------------------------+----------------------------------
+        --  tatcccttcagatggtaggatacggttacttgattagttcgttgtcctgatggcacaatccatgagagcaaagcc                          | acgattacaatattctc                | sm
+        --  tccgaacccaagtatcggacgtgctcctttaaaataccaaatcctaaggggg                                                 | acgatccctgttgtcgcccgtatc         | vdahcsyk
+        --  agtcaggtataattgtgcatttcggagaagaggtcctcatgtgcgcggcaggattagaccgccac                                    | acgacccacaaat                    | tbygryv
+        --  atatcgagtgtac                                                                                        | acgagaaatgagaattt                | bmdrhhcdvhycksdgab
+        --  tacatcagaatcctaaatatgcagatcacatatacggaatcccgcggtaaatttaactatgggggaggattccagacaagtgaatcatatattagca    | acgatagtagt                      | mtbhmrsdymdhtdkmbhacrbkdssm
+        --  ggtaacataattaaccctatccagcaaatcactctacgagttt                                                          | acgatgactgacga                   | ygbrdttmktghbk
+        --  tcccgtaacgtaagagactgtaacatgcaggtaacccaagtgccccctggtggcgatcctccagtgcggagagcgctacatggatccac            | acgact                           | rdgastysdykvwcsbsgyvdgwg
+        --  atctcaagacagagtactactatgcgtcgcaggtcgccttggagaatccacggaaatgttgtctt                                    | acgacgctcg                       | dgshcwdhagvrsgmksydygatraghs
+
+    -- Execution Plan
+        --                                                          QUERY PLAN                                                         
+        -- ----------------------------------------------------------------------------------------------------------------------------
+        --  Bitmap Heap Scan on dna_kmer_test  (cost=1523.78..3600.78 rows=50000 width=85) (actual time=0.438..0.788 rows=375 loops=1)
+        --    Recheck Cond: (kmer ^@ 'acga'::kmer)
+        --    Heap Blocks: exact=326
+        --    ->  Bitmap Index Scan on kmer_index  (cost=0.00..1511.28 rows=50000 width=0) (actual time=0.371..0.372 rows=375 loops=1)
+        --          Index Cond: (kmer ^@ 'acga'::kmer)
+        --  Planning Time: 0.106 ms
+        --  Execution Time: 0.869 ms
+        -- (7 rows)
 
 -- ########################################################################
