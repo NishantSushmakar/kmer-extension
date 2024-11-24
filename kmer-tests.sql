@@ -8,7 +8,7 @@
 -------------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------
 
-    -- TEST 1.1 DEfining valid values
+    -- TEST 1.1 Defining valid values
         SELECT 'AAAACCCCGGGGTTTT'::dna, 'ACGTTGCA'::dna;  
     
     -- Result:
@@ -885,7 +885,7 @@
 
 -- ############################### Count ###############################
 
--- COUNT 
+-- TEST 12.1: COUNT 
 
     SELECT COUNT(k.kmer) 
     FROM generate_kmers('ACGTACGT'::dna, 4) AS k(kmer); -- Return 5
@@ -911,7 +911,7 @@
 
 -- ############################### GROUP BY ###############################
 
--- GROUP BY Using column name and number in the clause
+-- TEST 13.1: GROUP BY Using column name and number in the clause
 
     SELECT k.kmer, COUNT(*) as kmer_count 
     FROM generate_kmers('ACGTACGT'::dna, 4) AS k(kmer) 
@@ -936,7 +936,7 @@
         --  Planning Time: 0.102 ms
         --  Execution Time: 0.097 ms
         -- (6 rows)
-        
+
 -- ########################################################################
 
 
