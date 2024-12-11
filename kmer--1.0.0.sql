@@ -142,16 +142,14 @@ CREATE OPERATOR = (
   RIGHTARG = kmer,
   PROCEDURE = equals,
   COMMUTATOR = '=',
-  RESTRICT = eqsel,
-  join = eqjoinsel
+  RESTRICT = eqsel
 );
 
 -- Starts with Operator
 CREATE OPERATOR ^@ (
     LEFTARG = kmer,
     RIGHTARG = kmer,
-    PROCEDURE = starts_with_op,
-    RESTRICT = matchingsel
+    PROCEDURE = starts_with_op
 );
 
 -- Containing Operator
