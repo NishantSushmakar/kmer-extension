@@ -20,88 +20,6 @@
 
 /*****************************************************************************/
 
-// TODO: Make a common function for contains and containing, call from headers
-
-// Containing function
-PG_FUNCTION_INFO_V1(kmer_containing);
-Datum kmer_containing(PG_FUNCTION_ARGS)
-{
-	KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(0);
-	QKMER *qkmer = (QKMER *)PG_GETARG_VARLENA_P(1);
-
-	int len1 = VARSIZE_ANY_EXHDR(qkmer);
-	int len2 = VARSIZE_ANY_EXHDR(kmer);
-
-	// if length of Qkmer and kmer are not equal then is not a match
-	if (len1 != len2)
-		PG_RETURN_BOOL(false);
-
-	char *qkmer_str = VARDATA_ANY(qkmer);
-	char *kmer_str = VARDATA_ANY(kmer);
-
-	// compare every qkmer char to see if is a corresponding match to a kmer
-	for (int i = 0; i < len1; i++)
-	{
-		if (!match(qkmer_str[i], kmer_str[i]))
-		{
-			PG_RETURN_BOOL(false);
-		}
-	}
-
-	PG_RETURN_BOOL(true);
-}
-
-// Contains function
-PG_FUNCTION_INFO_V1(kmer_contains);
-Datum kmer_contains(PG_FUNCTION_ARGS)
-{
-	QKMER *qkmer = (QKMER *)PG_GETARG_VARLENA_P(0);
-	KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(1);
-
-	int len1 = VARSIZE_ANY_EXHDR(qkmer);
-	int len2 = VARSIZE_ANY_EXHDR(kmer);
-
-	// if length of Qkmer and kmer are not equal then is not a match
-	if (len1 != len2)
-		PG_RETURN_BOOL(false);
-
-	char *qkmer_str = VARDATA_ANY(qkmer);
-	char *kmer_str = VARDATA_ANY(kmer);
-
-	// compare every qkmer char to see if is a corresponding match to a kmer
-	for (int i = 0; i < len1; i++)
-	{
-		if (!match(qkmer_str[i], kmer_str[i]))
-		{
-			PG_RETURN_BOOL(false);
-		}
-	}
-
-	PG_RETURN_BOOL(true);
-}
-
-// Starts with function
-PG_FUNCTION_INFO_V1(kmer_starts_with);
-Datum kmer_starts_with(PG_FUNCTION_ARGS)
-{
-	KMER *prefix = (KMER *)PG_GETARG_VARLENA_P(0);
-	KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(1);
-
-	int len1 = VARSIZE_ANY_EXHDR(prefix);
-	int len2 = VARSIZE_ANY_EXHDR(kmer);
-
-	// if length of prefix greater than kmer then its always false
-	if (len1 > len2)
-		PG_RETURN_BOOL(false);
-
-	// compare the kmer with the given prefix
-	bool result = memcmp(VARDATA_ANY(prefix), VARDATA_ANY(kmer), len1) == 0;
-
-	PG_RETURN_BOOL(result);
-}
-
-/*****************************************************************************/
-
 /*SP-Gist index functions implementation*/
 // Static information about the index implementation
 PG_FUNCTION_INFO_V1(kmer_config);
@@ -112,6 +30,7 @@ Datum kmer_config(PG_FUNCTION_ARGS)
 
 	cfg->prefixType = in->attType;
 	cfg->labelType = INT2OID;
+	cfg->leafType = in->attType;
 	cfg->canReturnData = true;
 	cfg->longValuesOK = false;
 
@@ -276,9 +195,6 @@ Datum kmer_picksplit(PG_FUNCTION_ARGS)
 			commonLen = tmp;
 	}
 
-	/* Ensure prefix length does not exceed max allowed for SP-GiST */
-	commonLen = Min(commonLen, SPGIST_MAX_PREFIX_LENGTH);
-
 	/* Set node prefix if there's a common prefix */
 	if (commonLen == 0)
 	{
@@ -419,26 +335,20 @@ Datum kmer_inner_consistent(PG_FUNCTION_ARGS)
 					res = false;
 				break;
 			case RTContainsStrategyNumber:
+			case RTContainedByStrategyNumber:
 				inQkmer = (QKMER *)DatumGetPointer(arg);
 				inSize = VARSIZE_ANY_EXHDR(inQkmer);
-				if (inSize < thisLen)
-				{
-					res = false;
-				}
-				else
-				{
-					char *qkmer_str = VARDATA_ANY(inQkmer);
-					char *kmer_str = VARDATA_ANY(reconstrKmer);
-					for (int i = 0; i < Min(inSize, thisLen); i++)
-					{
-						if (!match(qkmer_str[i], kmer_str[i]))
-						{
-							res = false;
-							break;
-						}
-					}
-				}
-
+				res = (inSize >= thisLen);
+                if (res) {
+                    char *qkmer_str = VARDATA_ANY(inQkmer);
+                    char *kmer_str = VARDATA_ANY(reconstrKmer);
+                    for (int i = 0; i < thisLen; i++) {
+                    	if (!match(qkmer_str[i], kmer_str[i])) {
+                    		res = false;
+                    		break;
+                    	}
+                    }
+                }
 				break;
 			case RTPrefixStrategyNumber:
 				inKmer = (KMER *)DatumGetPointer(arg);
@@ -530,6 +440,7 @@ Datum kmer_leaf_consistent(PG_FUNCTION_ARGS)
 		int queryLen;
 		KMER *query;
 		QKMER *patternQuery;
+		char *queryValue;
 
 		/* Apply the comparison strategy */
 		switch (strategy)
@@ -543,18 +454,25 @@ Datum kmer_leaf_consistent(PG_FUNCTION_ARGS)
 		case RTPrefixStrategyNumber:
 			query = (KMER *)DatumGetPointer(arg);
 			queryLen = VARSIZE_ANY_EXHDR(query);
-			res = (level >= queryLen) ||
-				  DatumGetBool(DirectFunctionCall2(kmer_starts_with,
-												   PointerGetDatum(query),
-												   out->leafValue));
+			r = memcmp(fullValue, VARDATA_ANY(query), Min(queryLen, fullLen));
+			res = (level >= queryLen) || ((queryLen <= fullLen) && (r == 0));
 			break;
 		case RTContainsStrategyNumber:
+		case RTContainedByStrategyNumber:
 			patternQuery = (QKMER *)DatumGetPointer(arg);
 			queryLen = VARSIZE_ANY_EXHDR(patternQuery);
-			res = (queryLen == fullLen) &&
-			    DatumGetBool(DirectFunctionCall2(kmer_contains,
-				                                PointerGetDatum(patternQuery),
-				                                out->leafValue));
+			queryValue = VARDATA_ANY(patternQuery);
+
+            res = (queryLen == fullLen);
+            if (res) {
+                for (int i = 0; i < fullLen; i++) {
+                    if (!match(queryValue[i], fullValue[i])) {
+                        res = false;
+                        break;
+                    }
+                }
+            }
+
 			break;
 		default:
 			elog(ERROR, "unrecognized strategy number: %d", in->scankeys[j].sk_strategy);

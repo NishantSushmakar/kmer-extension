@@ -14,8 +14,6 @@ typedef struct spgNodePtr
     int16 c;
 } spgNodePtr;
 
-#define SPGIST_MAX_PREFIX_LENGTH Max((int)(BLCKSZ - 258 * 16 - 100), 32)
-
 // Define value for VARATT_SHORT_MAX if not already defined
 #ifndef VARATT_SHORT_MAX
 #define VARATT_SHORT_MAX 127
