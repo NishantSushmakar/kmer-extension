@@ -21,10 +21,14 @@ PG_FUNCTION_INFO_V1(dna_in);
 Datum dna_in(PG_FUNCTION_ARGS)
 {
 	char *input = PG_GETARG_CSTRING(0);
+	int len = strlen(input);
 
 	validate_sequence(input);
 
-	DNA *result = (DNA *)cstring_to_text(input);
+	DNA *result = (DNA *)palloc(len + VARHDRSZ);
+    SET_VARSIZE(result, len + VARHDRSZ);
+    if (len) memcpy(VARDATA_ANY(result), input, len);
+
 	PG_RETURN_POINTER(result);
 }
 
@@ -176,6 +180,26 @@ Datum kmer_equals(PG_FUNCTION_ARGS)
 	PG_RETURN_BOOL(result);
 }
 
+// Starts with function
+PG_FUNCTION_INFO_V1(kmer_starts_with);
+Datum kmer_starts_with(PG_FUNCTION_ARGS)
+{
+	KMER *prefix = (KMER *)PG_GETARG_VARLENA_P(0);
+	KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(1);
+
+	int len1 = VARSIZE_ANY_EXHDR(prefix);
+	int len2 = VARSIZE_ANY_EXHDR(kmer);
+
+	// if length of prefix greater than kmer then its always false
+	if (len1 > len2)
+		PG_RETURN_BOOL(false);
+
+	// compare the kmer with the given prefix
+	bool result = memcmp(VARDATA_ANY(prefix), VARDATA_ANY(kmer), len1) == 0;
+
+	PG_RETURN_BOOL(result);
+}
+
 // starts with function specially for the operator
 PG_FUNCTION_INFO_V1(kmer_starts_with_op);
 Datum kmer_starts_with_op(PG_FUNCTION_ARGS)
@@ -193,6 +217,64 @@ Datum kmer_starts_with_op(PG_FUNCTION_ARGS)
 	bool result = memcmp(VARDATA_ANY(prefix), VARDATA_ANY(kmer), len1) == 0;
 
 	PG_RETURN_BOOL(result);
+}
+
+// Containing function
+PG_FUNCTION_INFO_V1(kmer_containing);
+Datum kmer_containing(PG_FUNCTION_ARGS)
+{
+	KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(0);
+	QKMER *qkmer = (QKMER *)PG_GETARG_VARLENA_P(1);
+
+	int len1 = VARSIZE_ANY_EXHDR(qkmer);
+	int len2 = VARSIZE_ANY_EXHDR(kmer);
+
+	// if length of qkmer and kmer are not equal then is not a match
+	if (len1 != len2)
+		PG_RETURN_BOOL(false);
+
+	char *qkmer_str = VARDATA_ANY(qkmer);
+	char *kmer_str = VARDATA_ANY(kmer);
+
+	// compare every qkmer char to see if is a corresponding match to a kmer
+	for (int i = 0; i < len1; i++)
+	{
+		if (!match(qkmer_str[i], kmer_str[i]))
+		{
+			PG_RETURN_BOOL(false);
+		}
+	}
+
+	PG_RETURN_BOOL(true);
+}
+
+// Contains function
+PG_FUNCTION_INFO_V1(kmer_contains);
+Datum kmer_contains(PG_FUNCTION_ARGS)
+{
+	QKMER *qkmer = (QKMER *)PG_GETARG_VARLENA_P(0);
+	KMER *kmer = (KMER *)PG_GETARG_VARLENA_P(1);
+
+	int len1 = VARSIZE_ANY_EXHDR(qkmer);
+	int len2 = VARSIZE_ANY_EXHDR(kmer);
+
+	// if length of Qkmer and kmer are not equal then is not a match
+	if (len1 != len2)
+		PG_RETURN_BOOL(false);
+
+	char *qkmer_str = VARDATA_ANY(qkmer);
+	char *kmer_str = VARDATA_ANY(kmer);
+
+	// compare every qkmer char to see if is a corresponding match to a kmer
+	for (int i = 0; i < len1; i++)
+	{
+		if (!match(qkmer_str[i], kmer_str[i]))
+		{
+			PG_RETURN_BOOL(false);
+		}
+	}
+
+	PG_RETURN_BOOL(true);
 }
 
 // generate kmer function

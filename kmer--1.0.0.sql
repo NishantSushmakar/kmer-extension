@@ -141,13 +141,17 @@ CREATE OPERATOR = (
   LEFTARG = kmer,
   RIGHTARG = kmer,
   PROCEDURE = equals,
-  COMMUTATOR = '='
+  COMMUTATOR = '=',
+  RESTRICT = eqsel,
+  join = eqjoinsel
 );
+
 -- Starts with Operator
 CREATE OPERATOR ^@ (
     LEFTARG = kmer,
     RIGHTARG = kmer,
-    PROCEDURE = starts_with_op
+    PROCEDURE = starts_with_op,
+    RESTRICT = matchingsel
 );
 
 -- Containing Operator
@@ -155,7 +159,8 @@ CREATE OPERATOR <@ (
     LEFTARG = kmer,
     RIGHTARG = qkmer,
     PROCEDURE = containing,
-    COMMUTATOR = '@>'
+    COMMUTATOR = '@>',
+    RESTRICT = matchingsel
 );
 
 -- Contains Operator
@@ -163,7 +168,8 @@ CREATE OPERATOR @> (
     LEFTARG = qkmer,
     RIGHTARG = kmer,
     PROCEDURE = contains,
-    COMMUTATOR = '<@'
+    COMMUTATOR = '<@',
+    RESTRICT = matchingsel
 );
 
 -- Create the operator class for SP-GiST support
@@ -172,25 +178,13 @@ CREATE OPERATOR CLASS kmer_spgist_ops
     -- Define the required SP-GiST support functions
     OPERATOR 3 = (kmer, kmer),
     OPERATOR 7 @> (qkmer, kmer),
-    OPERATOR 7 <@ (kmer, qkmer),
+    OPERATOR 8 <@ (kmer, qkmer),
     OPERATOR 28 ^@ (kmer, kmer),
     FUNCTION 1 kmer_config(internal, internal),
     FUNCTION 2 kmer_choose(internal, internal),
     FUNCTION 3 kmer_picksplit(internal, internal),
     FUNCTION 4 kmer_inner_consistent(internal, internal),
     FUNCTION 5 kmer_leaf_consistent(internal, internal);
-
--- Comparison function for B-tree support
-CREATE FUNCTION cmp(kmer, kmer)
-    RETURNS integer
-    AS 'MODULE_PATHNAME', 'kmer_cmp'
-    LANGUAGE C IMMUTABLE STRICT;
-
--- Create the operator class for B-tree support
-CREATE OPERATOR CLASS kmer_btree_ops
-    DEFAULT FOR TYPE kmer USING btree AS
-        OPERATOR        3       = ,
-        FUNCTION        1       cmp(kmer, kmer);
 
 -- Create the operator class for hash support
 CREATE OPERATOR CLASS kmer_hash_ops
